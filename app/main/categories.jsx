@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#333",
   },
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
   },
   buttonText: {
-    fontSize: 16,
+    fontWeight: 'bold',
   },
   saveButtonText: {
     color: "#fff",

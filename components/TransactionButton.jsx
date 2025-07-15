@@ -1,7 +1,6 @@
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function TransactionButton({ book }) {
   const router = useRouter();
@@ -21,7 +20,7 @@ export default function TransactionButton({ book }) {
         style={[styles.actionButton, styles.cashOutButton]}
         onPress={() => handleAddTransaction("cashout")}
       >
-        <Ionicons name="arrow-down" size={24} color="white" />
+        <Ionicons name="arrow-down" size={18} color="white" />
         <Text style={styles.buttonText}>Cash Out</Text>
       </TouchableOpacity>
 
@@ -29,7 +28,7 @@ export default function TransactionButton({ book }) {
         style={[styles.actionButton, styles.cashInButton]}
         onPress={() => handleAddTransaction("cashin")}
       >
-        <Ionicons name="arrow-up" size={24} color="white" />
+        <Ionicons name="arrow-up" size={18} color="white" />
         <Text style={styles.buttonText}>Cash In</Text>
       </TouchableOpacity>
     </View>
@@ -57,7 +56,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   cashInButton: {
     backgroundColor: "#4CAF50",
@@ -69,6 +68,5 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     marginLeft: 8,
-    fontSize: 16,
   },
 });

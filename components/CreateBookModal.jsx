@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
     marginBottom: 20,
     color: "#333",
@@ -138,8 +138,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#a0a0a0",
   },
   buttonText: {
-    fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "bold",
     color: "#fff",
   },
 });

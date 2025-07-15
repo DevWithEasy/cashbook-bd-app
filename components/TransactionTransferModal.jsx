@@ -54,8 +54,6 @@ export default function TransactionTransferModal({
           <Text style={styles.modalText}>
             Move this transaction from {currentBookName} to another book
           </Text>
-
-          <Text style={styles.label}>Select Destination Book:</Text>
           <View style={styles.pickerContainer}>
             <Picker
               selectedValue={selectedBook}
@@ -109,19 +107,19 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
   },
   modalText: {
-    fontSize: 16,
+    fontSize: 14,
     marginBottom: 16,
     color: "#555",
   },
   modalButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 20,
+    marginTop: 10,
   },
   pickerContainer: {
     borderWidth: 1,
@@ -133,12 +131,6 @@ const styles = StyleSheet.create({
   },
   picker: {
     width: "100%",
-  },
-    label: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginTop: 10,
-    marginBottom: 5,
   },
   button: {
     flex: 1,
@@ -155,7 +147,6 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "white",
-    fontSize: 16,
     fontWeight: "bold",
   },
 });

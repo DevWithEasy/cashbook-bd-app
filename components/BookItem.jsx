@@ -16,7 +16,7 @@ export default function BookItem({ book }) {
       })}
     >
       <View style={styles.bookInfo}>
-        <Ionicons name="book" size={20} color="#007AFF" style={styles.bookIcon} />
+        <Ionicons name="book" size={20} color="#6b6c6dff" style={styles.bookIcon} />
         <Text style={styles.bookName}>{book?.name}</Text>
       </View>
       <Ionicons name="chevron-forward" size={20} color="#888" />
@@ -37,7 +37,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 0.7,
   },
   bookInfo: {
     flexDirection: "row",

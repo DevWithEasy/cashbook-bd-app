@@ -70,6 +70,7 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     padding: 10,
+    paddingHorizontal : 20,
     marginLeft: 10,
     borderRadius: 5,
   },
@@ -81,5 +82,6 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: "white",
+    fontWeight: 'bold',
   },
 });

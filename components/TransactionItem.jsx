@@ -1,8 +1,21 @@
 import { useRouter } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
+const getCategoryColor = (categoryName) => {
+  if (!categoryName) return "#CCCCCC"; 
+  
+  let hash = 0;
+  for (let i = 0; i < categoryName.length; i++) {
+    hash = categoryName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  const hue = Math.abs(hash % 360);
+  return `hsl(${hue}, 70%, 95%)`; 
+};
+
 export default function TransactionItem({ transaction, runningBalance }) {
   const router = useRouter();
+  const categoryColor = getCategoryColor(transaction.category_name);
   
   const handleTransactionPress = () => {
     router.push({
@@ -17,33 +30,34 @@ export default function TransactionItem({ transaction, runningBalance }) {
       activeOpacity={0.7}
     >
       <View style={styles.transactionItem}>
-        {/* First Line - Category and Amount */}
-        <View style={styles.firstLine}>
-          <Text style={styles.categoryText} numberOfLines={1} ellipsizeMode="tail">
-            {transaction.category_name || "Uncategorized"}
-          </Text>
-          <View style={styles.rightAligned}>
-            <Text style={transaction.cashin ? styles.incomeText : styles.expenseText}>
-              {transaction.amount.toLocaleString()}
+        {/* First Row - Category and Amount in same line */}
+        <View style={styles.firstRow}>
+          <View style={[styles.categoryContainer, { backgroundColor: categoryColor }]}>
+            <Text style={styles.categoryText} numberOfLines={1} ellipsizeMode="tail">
+              {transaction.category_name || "Uncategorized"}
             </Text>
           </View>
+          
+          <Text style={transaction.cashin ? styles.incomeText : styles.expenseText}>
+            {transaction.amount.toLocaleString()}
+          </Text>
         </View>
 
-        {/* Second Line - Balance (right aligned) */}
+        {/* Second Row - Balance (right aligned) */}
         <View style={styles.balanceContainer}>
           <Text style={styles.balanceText}>
             Balance: {runningBalance.toLocaleString()}
           </Text>
         </View>
 
-        {/* Third Line - Remark (single line with ellipsis) */}
+        {/* Third Row - Remark (if exists) */}
         {transaction.remark && (
           <Text style={styles.remarkText} numberOfLines={1} ellipsizeMode="tail">
             {transaction.remark}
           </Text>
         )}
 
-        {/* Fourth Line - Date and Time (italic) */}
+        {/* Fourth Row - Date and Time */}
         <Text style={styles.dateText}>
           {transaction.date} • {transaction.time}
         </Text>
@@ -62,49 +76,51 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 0.3,
   },
-  firstLine: {
+  firstRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 6,
+    alignItems: "center",
+    marginBottom: 4,
   },
-  rightAligned: {
-    alignItems: "flex-end",
+  categoryContainer: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
   },
   categoryText: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: 12,
+    fontWeight: "600",
     color: "#333",
-    flex: 1,
-    marginRight: 10,
   },
   incomeText: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#4CAF50",
+    color: "#4CAF50", // Green for income
   },
   expenseText: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#F44336",
+    color: "#F44336", // Red for expense
   },
   balanceContainer: {
     alignItems: "flex-end",
     marginBottom: 6,
   },
   balanceText: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#666",
+    fontWeight: "500",
   },
   remarkText: {
     fontSize: 14,
     color: "#666",
     marginBottom: 6,
+    fontStyle: "italic",
   },
   dateText: {
     fontSize: 12,
     color: "#999",
-    fontStyle: "italic",
   },
 });

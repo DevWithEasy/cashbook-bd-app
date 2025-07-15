@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -25,7 +25,6 @@ export default function BookDetails() {
   const id = params.id;
 
   const [transactions, setTransactions] = useState([]);
-  const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [db, setDb] = useState(null);
@@ -34,17 +33,32 @@ export default function BookDetails() {
   const [newBookName, setNewBookName] = useState(book?.name || "");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const calculateRunningBalance = () => {
+  // Calculate running balance for ALL transactions
+  const transactionsWithBalance = useMemo(() => {
     let balance = 0;
-    return transactions.reverse().map((transaction, index) => {
-      if (transaction.cashin) {
-        balance += transaction.amount;
-      } else {
-        balance -= transaction.amount;
-      }
-      return { ...transaction, runningBalance: balance };
-    }).reverse();
-  };
+    return transactions
+      .slice() // Create a copy to avoid mutating original
+      .reverse()
+      .map((transaction) => {
+        balance = transaction.cashin
+          ? balance + transaction.amount
+          : balance - transaction.amount;
+        return { ...transaction, runningBalance: balance };
+      })
+      .reverse();
+  }, [transactions]);
+
+  // Filter transactions based on search query
+  const displayedTransactions = useMemo(() => {
+    if (!searchQuery) return transactionsWithBalance;
+
+    return transactionsWithBalance.filter(
+      (t) =>
+        t.remark?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.amount.toString().includes(searchQuery) ||
+        t.category_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [searchQuery, transactionsWithBalance]);
 
   // Initialize database
   useEffect(() => {
@@ -57,21 +71,6 @@ export default function BookDetails() {
       fetchTransactions(db, id, setTransactions, setError, setLoading);
     }
   }, [db, id]);
-
-  // Filter transactions based on search query
-  useEffect(() => {
-    if (searchQuery) {
-      const filtered = transactions.filter(
-        (t) =>
-          t.remark?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          t.amount.toString().includes(searchQuery) ||
-          t.category_name?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredTransactions(filtered);
-    } else {
-      setFilteredTransactions(transactions);
-    }
-  }, [searchQuery, transactions]);
 
   const handleMenuPress = () => {
     setMenuVisible(!menuVisible);
@@ -131,7 +130,7 @@ export default function BookDetails() {
           db={db}
           id={id}
           book={book}
-          transactions={calculateRunningBalance()}
+          transactions={transactionsWithBalance}
           setMenuVisible={setMenuVisible}
           setEditModalVisible={setEditModalVisible}
         />
@@ -157,20 +156,19 @@ export default function BookDetails() {
         />
       </View>
 
-      {/* Balance Summary */}
-      {transactions.length > 0 &&  <BookBalanceSummery
-        transactions={transactions}
-      />}
+      {/* Balance Summary - Shows summary for ALL transactions */}
+      <BookBalanceSummery transactions={displayedTransactions} />
 
-      {/* Transaction Count */}
+      {/* Transaction Count - Shows count of FILTERED transactions */}
       <Text style={styles.transactionCount}>
-        Showing {filteredTransactions.length} entries
+        Showing {displayedTransactions.length} {searchQuery ? "matching " : ""}
+        entries
       </Text>
 
-      {/* Transactions List */}
-      {filteredTransactions.length > 0 ? (
+      {/* Transactions List - Shows FILTERED transactions with PROPER running balance */}
+      {displayedTransactions.length > 0 ? (
         <FlatList
-          data={calculateRunningBalance()}
+          data={displayedTransactions}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <TransactionItem
@@ -181,7 +179,11 @@ export default function BookDetails() {
           contentContainerStyle={styles.listContainer}
         />
       ) : (
-        <Text style={styles.emptyText}>No transactions found</Text>
+        <Text style={styles.emptyText}>
+          {searchQuery
+            ? "No matching transactions found"
+            : "No transactions found"}
+        </Text>
       )}
 
       <TransactionButton book={book} />
@@ -201,13 +203,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 4,
     marginBottom: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 1,
   },
   searchInput: {
     flex: 1,
