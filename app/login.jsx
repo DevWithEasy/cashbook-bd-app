@@ -1,5 +1,14 @@
-import { useState, useRef } from 'react';
-import { Text, View, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { useState, useRef, useEffect } from 'react';
+import {
+  Text,
+  View,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { router } from 'expo-router';
 import { getData } from '../utils/localData';
 
@@ -8,58 +17,50 @@ export default function Login() {
   const [attempts, setAttempts] = useState(0);
   const pinInputs = useRef([]);
 
+  useEffect(() => {
+    pinInputs.current[0]?.focus();
+  }, []);
+
   const handlePinChange = (text, index) => {
-    // Create new array with current PIN digits
-    const digits = [...pin.split('')];
-    // Ensure we have 4 digits (fill with empty strings if needed)
-    while (digits.length < 4) digits.push('');
-    
-    // Update the specific digit
-    digits[index] = text;
-    
-    // Create complete PIN string (ensure only 4 digits)
-    const completePin = digits.slice(0, 4).join('');
-    
-    // Update state
-    setPin(completePin);
-    
-    // Auto focus next input
+    const pinArray = pin.split('');
+    pinArray[index] = text;
+    const newPin = pinArray.join('').slice(0, 4);
+    setPin(newPin);
+
     if (text && index < 3) {
-      pinInputs.current[index + 1].focus();
+      pinInputs.current[index + 1]?.focus();
     }
-    
-    // Auto submit when complete - using completePin directly
-    if (completePin.length === 4) {
-      setTimeout(() => verifyPin(completePin), 0);
+
+    if (newPin.length === 4) {
+      setTimeout(() => verifyPin(newPin), 100);
     }
   };
 
   const handleKeyPress = ({ nativeEvent }, index) => {
-    if (nativeEvent.key === 'Backspace' && index > 0 && !pin[index]) {
-      pinInputs.current[index - 1].focus();
+    if (nativeEvent.key === 'Backspace' && !pin[index] && index > 0) {
+      pinInputs.current[index - 1]?.focus();
     }
   };
 
   const verifyPin = async (enteredPin) => {
     try {
       const storedPin = await getData('appPin');
-      
       if (enteredPin === storedPin) {
         router.replace('/main');
       } else {
         const newAttempts = attempts + 1;
         setAttempts(newAttempts);
-        
+
         if (newAttempts >= 3) {
           Alert.alert(
             'Too Many Attempts',
             'You have exceeded the maximum attempts. Please use PIN recovery.',
-            [{ text: 'OK', onPress: () => router.push('/recover-pin') }]
+            [{ text: 'Recover PIN', onPress: () => router.push('/recover-pin') }]
           );
         } else {
           Alert.alert('Incorrect PIN', `Attempts remaining: ${3 - newAttempts}`);
           setPin('');
-          pinInputs.current[0].focus();
+          pinInputs.current[0]?.focus();
         }
       }
     } catch (error) {
@@ -69,72 +70,80 @@ export default function Login() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome to CashMate</Text>
-      <Text style={styles.subtitle}>Enter your 4-digit PIN</Text>
-      
-      <View style={styles.pinContainer}>
-        {[0, 1, 2, 3].map((index) => (
-          <TextInput
-            key={index}
-            ref={ref => pinInputs.current[index] = ref}
-            style={styles.pinInput}
-            keyboardType="numeric"
-            maxLength={1}
-            secureTextEntry
-            onChangeText={text => handlePinChange(text, index)}
-            onKeyPress={(e) => handleKeyPress(e, index)}
-            value={pin[index] || ''}
-            autoFocus={index === 0}
-          />
-        ))}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.inner}>
+        <Text style={styles.title}>Welcome to CashMate</Text>
+        <Text style={styles.subtitle}>Enter your 4-digit PIN</Text>
+
+        <View style={styles.pinContainer}>
+          {[0, 1, 2, 3].map((index) => (
+            <TextInput
+              key={index}
+              ref={(ref) => (pinInputs.current[index] = ref)}
+              style={styles.pinInput}
+              keyboardType="numeric"
+              maxLength={1}
+              secureTextEntry
+              onChangeText={(text) => handlePinChange(text, index)}
+              onKeyPress={(e) => handleKeyPress(e, index)}
+              value={pin[index] || ''}
+              autoFocus={index === 0}
+            />
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={styles.forgotButton}
+          onPress={() => router.push('/recover-pin')}
+        >
+          <Text style={styles.forgotText}>Forgot PIN?</Text>
+        </TouchableOpacity>
       </View>
-      
-      <TouchableOpacity 
-        style={styles.forgotButton}
-        onPress={() => router.push('/recover-pin')}
-      >
-        <Text style={styles.forgotText}>Forgot PIN?</Text>
-      </TouchableOpacity>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  inner: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 26,
+    fontWeight: '700',
     marginBottom: 10,
-    color: '#333',
+    color: '#2c3e50',
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#7f8c8d',
     marginBottom: 30,
   },
   pinContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '60%',
-    marginBottom: 30,
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 20,
   },
   pinInput: {
-    width: 50,
-    height: 50,
+    width: 55,
+    height: 55,
     borderWidth: 1,
     borderColor: '#007AFF',
-    borderRadius: 8,
+    borderRadius: 10,
     textAlign: 'center',
-    fontSize: 20,
-    color: '#333',
-    marginHorizontal : 2,
+    fontSize: 22,
+    color: '#2c3e50',
+    backgroundColor: '#f8f9fa',
   },
   forgotButton: {
     marginTop: 20,
@@ -142,5 +151,6 @@ const styles = StyleSheet.create({
   forgotText: {
     color: '#007AFF',
     fontSize: 16,
+    fontWeight: '500',
   },
 });

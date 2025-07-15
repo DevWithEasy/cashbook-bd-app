@@ -66,7 +66,7 @@ export default function Index() {
         entering={FadeIn.delay(200).duration(1000)}
         exiting={FadeOut}
       >
-        HisabiFy Pro
+        CashBook BD
       </Animated.Text>
 
       {showSubtitle && (

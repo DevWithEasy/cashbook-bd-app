@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -14,14 +15,17 @@ import {
 import BookItem from "../../components/BookItem";
 import CreateBookModal from "../../components/CreateBookModal";
 import NoBooksFound from "../../components/NoBooksFound";
+import { getBooks } from "../../utils/bookController";
+import { useStore } from "../../utils/z-store";
 
 export default function Home() {
-  const [books, setBooks] = useState([]);
+  const { books, addBooks } = useStore();
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [db, setDb] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   // Initialize database
   useEffect(() => {
@@ -37,12 +41,7 @@ export default function Home() {
             name TEXT NOT NULL UNIQUE
           );
         `);
-
-        const results = await database.getAllAsync(
-          "SELECT * FROM books ORDER BY name ASC"
-        );
-        setBooks(results);
-        setFilteredBooks(results);
+        await loadBooks(database);
       } catch (error) {
         Alert.alert("Error", "Failed to initialize database");
         console.error("Database error:", error);
@@ -53,6 +52,31 @@ export default function Home() {
 
     initDB();
   }, []);
+
+  // Function to load books
+  const loadBooks = async (database) => {
+    try {
+      await getBooks(database, addBooks);
+      await getBooks(database, setFilteredBooks);
+    } catch (error) {
+      Alert.alert("Error", "Failed to load books");
+      console.error("Load books error:", error);
+    }
+  };
+
+  // Handle refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      if (db) {
+        await loadBooks(db);
+      }
+    } catch (error) {
+      console.error("Refresh error:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Filter books based on search query
   useEffect(() => {
@@ -77,7 +101,6 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      
       {/* Search Input */}
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
@@ -89,6 +112,7 @@ export default function Home() {
           clearButtonMode="while-editing"
         />
       </View>
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>My Books</Text>
@@ -101,6 +125,14 @@ export default function Home() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => <BookItem book={item} />}
           contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#007AFF"]}
+              tintColor="#007AFF"
+            />
+          }
         />
       ) : (
         <NoBooksFound />
@@ -111,7 +143,6 @@ export default function Home() {
         modalVisible={modalVisible}
         setModalVisible={setModalVisible}
         db={db}
-        setBooks={setBooks}
       />
 
       {/* Floating Action Button */}

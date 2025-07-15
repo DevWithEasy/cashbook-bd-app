@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 export default function Privacy() {
   const contactPrivacy = () => {
-    Linking.openURL('mailto:privacy@hisabifypro.com');
+    Linking.openURL('mailto:robiulawal68@gmail.com');
   };
 
   return (

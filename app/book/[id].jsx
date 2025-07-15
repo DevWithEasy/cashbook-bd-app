@@ -14,17 +14,18 @@ import {
 import BookMenu from "../../components/BookMenu";
 import TransactionButton from "../../components/TransactionButton";
 import TransactionItem from "../../components/TransactionItem";
-import TransactionUpdateModal from "../../components/TransactionUpdateModal";
+import BookUpdateModal from "../../c../../components/BookUpdateModal"
 import { initDb } from "../../utils/initDB";
 import { fetchTransactions } from "../../utils/transactionController";
 import BookBalanceSummery from "../../components/BookBalanceSummery";
+import { getBooks } from "../../utils/bookController";
+import { useStore } from "../../utils/z-store";
 
 export default function BookDetails() {
   const params = useLocalSearchParams();
   const book = params.book ? JSON.parse(params.book) : null;
   const id = params.id;
-
-  const [transactions, setTransactions] = useState([]);
+  const {books,addBooks,transactions, addTransactions} = useStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [db, setDb] = useState(null);
@@ -68,9 +69,9 @@ export default function BookDetails() {
   // Fetch transactions when db is ready
   useEffect(() => {
     if (db) {
-      fetchTransactions(db, id, setTransactions, setError, setLoading);
+      fetchTransactions(db, id, addTransactions, setError, setLoading);
     }
-  }, [db, id]);
+  }, [addTransactions, db, id]);
 
   const handleMenuPress = () => {
     setMenuVisible(!menuVisible);
@@ -89,6 +90,7 @@ export default function BookDetails() {
       ]);
       setEditModalVisible(false);
       book.name = newBookName;
+      getBooks(db,addBooks)
       Alert.alert("Success", "Book name updated successfully");
     } catch (err) {
       Alert.alert("Error", "Failed to update book name");
@@ -116,7 +118,7 @@ export default function BookDetails() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: book?.name || "Book Details",
+          title: books.find((findBook)=> findBook.id === book.id)?.name || "Book Details",
           headerRight: () => (
             <TouchableOpacity onPress={handleMenuPress}>
               <Ionicons name="ellipsis-vertical" size={20} />
@@ -137,7 +139,7 @@ export default function BookDetails() {
       )}
 
       {/* Edit Book Name Modal */}
-      <TransactionUpdateModal
+      <BookUpdateModal
         editModalVisible={editModalVisible}
         setEditModalVisible={setEditModalVisible}
         newBookName={newBookName}

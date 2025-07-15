@@ -4,22 +4,49 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function BookItem({ book }) {
   const router = useRouter();
-  
+
   return (
     <TouchableOpacity
       style={styles.bookItem}
-      onPress={() => router.push({
-        pathname: `/book/${book.id}`,
-        params: { 
-          book: JSON.stringify(book)
-        }
-      })}
+      onPress={() =>
+        router.push({
+          pathname: `/book/${book.id}`,
+          params: { book: JSON.stringify(book) },
+        })
+      }
     >
-      <View style={styles.bookInfo}>
-        <Ionicons name="book" size={20} color="#6b6c6dff" style={styles.bookIcon} />
-        <Text style={styles.bookName}>{book?.name}</Text>
+      {/* Left Side: Icon */}
+      <View
+      style={styles.bookIcon}
+      >
+        <Ionicons
+        name="reader"
+        size={20}
+        color="#3b82f6"
+      />
       </View>
-      <Ionicons name="chevron-forward" size={20} color="#888" />
+      {/* Middle: Name + Date */}
+      <View style={styles.infoContainer}>
+        <Text numberOfLines={1} style={styles.bookName}>
+          {book?.name}
+        </Text>
+        <Text style={styles.updatedText}>
+          Updated on: {book?.last_updated?.split(" ")[0] || "N/A"}
+        </Text>
+      </View>
+
+      {/* Right: Balance + Arrow */}
+      <View style={styles.rightContent}>
+        <Text
+          style={[
+            styles.balanceText,
+            { color: book?.balance >= 0 ? "#22c55e" : "#ef4444" },
+          ]}
+        >
+          {book?.balance?.toLocaleString() || "0"}
+        </Text>
+        <Ionicons name="chevron-forward" size={18} color="#888" />
+      </View>
     </TouchableOpacity>
   );
 }
@@ -27,27 +54,50 @@ export default function BookItem({ book }) {
 const styles = StyleSheet.create({
   bookItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 16,
+    backgroundColor: "#ffffff",
+    padding: 10,
     marginBottom: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
     elevation: 0.7,
   },
-  bookInfo: {
-    flexDirection: "row",
-    alignItems: "center",
+  bookIcon : {
+    backgroundColor : '#c9dbfdff',
+    borderRadius : 50,
+    height : 36,
+    width : 36,
+    justifyContent : 'center',
+    alignItems : 'center',
+    marginRight : 6
   },
-  bookIcon: {
-    marginRight: 12,
+  infoContainer: {
+    flex: 1,
+    justifyContent: "center",
   },
   bookName: {
     fontSize: 16,
-    color: "#333",
+    fontWeight: "600",
+    color: "#1e293b",
+  },
+  updatedText: {
+    fontSize: 12,
+    color: "#64748b",
+    fontStyle : 'italic',
+    marginTop: 2,
+  },
+  rightContent: {
+    flexDirection : 'row',
+    alignItems: "flex-end",
+    justifyContent: "center",
+    gap: 4,
+  },
+  balanceText: {
+    fontWeight: "600",
+    minWidth: 80,
+    textAlign: "right",
   },
 });

@@ -2,13 +2,14 @@ import { View, Text, StyleSheet, ScrollView, Image, Linking, TouchableOpacity } 
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
+
 export default function About() {
   const openWebsite = () => {
-    Linking.openURL('https://www.hisabifypro.com');
+    Linking.openURL('https://devwitheasy.vercel.app');
   };
 
   const contactSupport = () => {
-    Linking.openURL('mailto:support@hisabifypro.com');
+    Linking.openURL('mailto:robiulawal68@gmail.com');
   };
 
   return (
@@ -21,14 +22,14 @@ export default function About() {
           source={require('../../assets/images/logo.png')}
           style={styles.logo}
         />
-        <Text style={styles.appName}>HisabiFy Pro</Text>
+        <Text style={styles.appName}>CashBook BD</Text>
         <Text style={styles.appVersion}>Version 1.0.0</Text>
       </LinearGradient>
 
       <View style={styles.content}>
         <Text style={styles.heading}>About The App</Text>
         <Text style={styles.description}>
-          HisabiFy Pro is your personal finance manager designed to help you track expenses, 
+          CashBook BD is your personal finance manager designed to help you track expenses, 
           manage budgets, and achieve your financial goals. With intuitive features and 
           powerful analytics, take control of your money like never before.
         </Text>
@@ -45,6 +46,10 @@ export default function About() {
           <View style={styles.featureItem}>
             <Ionicons name="bar-chart-outline" size={24} color="#007AFF" />
             <Text style={styles.featureText}>Financial Reports</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <Ionicons name="book-outline" size={24} color="#007AFF" />
+            <Text style={styles.featureText}>PDF Generate</Text>
           </View>
         </View>
 

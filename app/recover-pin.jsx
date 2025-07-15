@@ -1,6 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
-import { Text, View, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { getData, saveData } from '../utils/localData';
 
 export default function RecoverPin() {
@@ -10,81 +19,71 @@ export default function RecoverPin() {
   const [confirmNewPin, setConfirmNewPin] = useState('');
   const [storedQuestion, setStoredQuestion] = useState('');
   const [storedAnswer, setStoredAnswer] = useState('');
-  
+
   const newPinInputs = useRef([]);
   const confirmNewPinInputs = useRef([]);
   const securityAnswerRef = useRef(null);
 
-  // Load security question and focus on input when component mounts
   useEffect(() => {
-    const loadSecurityData = async () => {
+    const loadData = async () => {
       const question = await getData('securityQuestion');
       const answer = await getData('securityAnswer');
-      setStoredQuestion(question);
-      setStoredAnswer(answer);
+      setStoredQuestion(question || 'Security question not found');
+      setStoredAnswer(answer || '');
     };
-    loadSecurityData();
-    
-    // Focus on security answer input after short delay
+    loadData();
+
     const timer = setTimeout(() => {
-      if (securityAnswerRef.current) {
-        securityAnswerRef.current.focus();
-      }
+      securityAnswerRef.current?.focus();
     }, 100);
-    
+
     return () => clearTimeout(timer);
   }, []);
 
-  // Focus first PIN input when step changes to reset
   useEffect(() => {
-    if (step === 'reset' && newPinInputs.current[0]) {
-      newPinInputs.current[0].focus();
+    if (step === 'reset') {
+      setTimeout(() => {
+        newPinInputs.current[0]?.focus();
+      }, 100);
     }
   }, [step]);
 
-  const handleNewPinChange = (text, index) => {
-    const digits = [...newPin.split('')];
-    while (digits.length < 4) digits.push('');
-    
-    digits[index] = text;
-    const completePin = digits.slice(0, 4).join('');
-    
-    setNewPin(completePin);
-    
+  const handlePinInput = (text, index, type) => {
+    const value = type === 'new' ? newPin : confirmNewPin;
+    const setter = type === 'new' ? setNewPin : setConfirmNewPin;
+    const refs = type === 'new' ? newPinInputs : confirmNewPinInputs;
+
+    const pinArray = value.split('');
+    pinArray[index] = text;
+    const updatedPin = pinArray.slice(0, 4).join('');
+    setter(updatedPin);
+
     if (text && index < 3) {
-      newPinInputs.current[index + 1].focus();
-    } else if (completePin.length === 4) {
-      // When PIN is complete, focus first confirm PIN input
-      confirmNewPinInputs.current[0]?.focus();
+      refs.current[index + 1]?.focus();
     }
   };
 
-  const handleConfirmNewPinChange = (text, index) => {
-    const digits = [...confirmNewPin.split('')];
-    while (digits.length < 4) digits.push('');
-    
-    digits[index] = text;
-    const completePin = digits.slice(0, 4).join('');
-    
-    setConfirmNewPin(completePin);
-    
-    if (text && index < 3) {
-      confirmNewPinInputs.current[index + 1].focus();
+  const handleKeyPress = (e, index, type) => {
+    const value = type === 'new' ? newPin : confirmNewPin;
+    const refs = type === 'new' ? newPinInputs : confirmNewPinInputs;
+
+    if (e.nativeEvent.key === 'Backspace' && index > 0 && !value[index]) {
+      refs.current[index - 1]?.focus();
     }
   };
 
   const verifySecurityAnswer = () => {
     if (!storedAnswer) {
-      Alert.alert('Error', 'Security information not loaded. Please try again.');
+      Alert.alert('Error', 'Security info not found. Please reinstall or contact support.');
       return;
     }
-    
-    if (securityAnswer.toLowerCase() === storedAnswer.toLowerCase()) {
+
+    if (securityAnswer.trim().toLowerCase() === storedAnswer.trim().toLowerCase()) {
       setStep('reset');
       setNewPin('');
       setConfirmNewPin('');
     } else {
-      Alert.alert('Incorrect Answer', 'The answer you provided is incorrect. Please try again.');
+      Alert.alert('Incorrect', 'Your answer did not match.');
       setSecurityAnswer('');
       securityAnswerRef.current?.focus();
     }
@@ -92,12 +91,12 @@ export default function RecoverPin() {
 
   const resetPin = async () => {
     if (newPin.length !== 4 || confirmNewPin.length !== 4) {
-      Alert.alert('Error', 'Please enter a complete 4-digit PIN');
+      Alert.alert('Error', 'PIN must be 4 digits long');
       return;
     }
 
     if (newPin !== confirmNewPin) {
-      Alert.alert('Error', 'PINs do not match. Please try again.');
+      Alert.alert('Error', 'PINs do not match');
       setConfirmNewPin('');
       confirmNewPinInputs.current[0]?.focus();
       return;
@@ -105,171 +104,170 @@ export default function RecoverPin() {
 
     try {
       await saveData('appPin', newPin);
-      Alert.alert('Success', 'Your PIN has been reset successfully');
+      Alert.alert('Success', 'PIN reset successful');
       router.replace('/login');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to reset PIN. Please try again.');
+    } catch (e) {
+      Alert.alert('Error', 'Could not reset PIN');
     }
   };
 
   return (
-    <View style={styles.container}>
-      {step === 'verify' && (
-        <>
-          <Text style={styles.title}>PIN Recovery</Text>
-          <Text style={styles.subtitle}>Answer your security question to reset your PIN</Text>
-          
-          <Text style={styles.questionText}>
-            {storedQuestion || 'Loading question...'}
-          </Text>
-          
-          <TextInput
-            ref={securityAnswerRef}
-            style={styles.input}
-            placeholder="Your answer"
-            value={securityAnswer}
-            onChangeText={setSecurityAnswer}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="done"
-            onSubmitEditing={verifySecurityAnswer}
-          />
-          
-          <TouchableOpacity 
-            style={[styles.button, !securityAnswer && styles.disabledButton]} 
-            onPress={verifySecurityAnswer}
-            disabled={!securityAnswer}
-          >
-            <Text style={styles.buttonText}>Verify Answer</Text>
-          </TouchableOpacity>
-        </>
-      )}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.inner}>
+        {step === 'verify' && (
+          <>
+            <Text style={styles.title}>Recover PIN</Text>
+            <Text style={styles.subtitle}>Answer your security question</Text>
+            <Text style={styles.question}>{storedQuestion}</Text>
 
-      {step === 'reset' && (
-        <>
-          <Text style={styles.title}>Set New PIN</Text>
-          
-          <Text style={styles.subtitle}>Enter your new 4-digit PIN</Text>
-          <View style={styles.pinContainer}>
-            {[0, 1, 2, 3].map((index) => (
-              <TextInput
-                key={`new-${index}`}
-                ref={ref => newPinInputs.current[index] = ref}
-                style={styles.pinInput}
-                keyboardType="numeric"
-                maxLength={1}
-                secureTextEntry
-                onChangeText={text => handleNewPinChange(text, index)}
-                onKeyPress={({ nativeEvent }) => {
-                  if (nativeEvent.key === 'Backspace' && index > 0 && !newPin[index]) {
-                    newPinInputs.current[index - 1].focus();
-                  }
-                }}
-                value={newPin[index] || ''}
-              />
-            ))}
-          </View>
-          
-          <Text style={styles.subtitle}>Confirm your new PIN</Text>
-          <View style={styles.pinContainer}>
-            {[0, 1, 2, 3].map((index) => (
-              <TextInput
-                key={`confirm-${index}`}
-                ref={ref => confirmNewPinInputs.current[index] = ref}
-                style={styles.pinInput}
-                keyboardType="numeric"
-                maxLength={1}
-                secureTextEntry
-                onChangeText={text => handleConfirmNewPinChange(text, index)}
-                onKeyPress={({ nativeEvent }) => {
-                  if (nativeEvent.key === 'Backspace' && index > 0 && !confirmNewPin[index]) {
-                    confirmNewPinInputs.current[index - 1].focus();
-                  }
-                }}
-                value={confirmNewPin[index] || ''}
-              />
-            ))}
-          </View>
-          
-          <TouchableOpacity 
-            style={[styles.button, (newPin.length !== 4 || confirmNewPin.length !== 4) && styles.disabledButton]} 
-            onPress={resetPin}
-            disabled={newPin.length !== 4 || confirmNewPin.length !== 4}
-          >
-            <Text style={styles.buttonText}>Reset PIN</Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </View>
+            <TextInput
+              ref={securityAnswerRef}
+              style={styles.input}
+              placeholder="Enter your answer"
+              value={securityAnswer}
+              onChangeText={setSecurityAnswer}
+              autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={verifySecurityAnswer}
+            />
+
+            <TouchableOpacity
+              style={[styles.button, !securityAnswer && styles.disabledButton]}
+              onPress={verifySecurityAnswer}
+              disabled={!securityAnswer}
+            >
+              <Text style={styles.buttonText}>Verify Answer</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {step === 'reset' && (
+          <>
+            <Text style={styles.title}>Set New PIN</Text>
+            <Text style={styles.subtitle}>Enter your new 4-digit PIN</Text>
+
+            <View style={styles.pinContainer}>
+              {[0, 1, 2, 3].map((i) => (
+                <TextInput
+                  key={`new-${i}`}
+                  ref={(ref) => (newPinInputs.current[i] = ref)}
+                  style={styles.pinInput}
+                  maxLength={1}
+                  keyboardType="numeric"
+                  secureTextEntry
+                  value={newPin[i] || ''}
+                  onChangeText={(text) => handlePinInput(text, i, 'new')}
+                  onKeyPress={(e) => handleKeyPress(e, i, 'new')}
+                />
+              ))}
+            </View>
+
+            <Text style={styles.subtitle}>Confirm your new PIN</Text>
+            <View style={styles.pinContainer}>
+              {[0, 1, 2, 3].map((i) => (
+                <TextInput
+                  key={`confirm-${i}`}
+                  ref={(ref) => (confirmNewPinInputs.current[i] = ref)}
+                  style={styles.pinInput}
+                  maxLength={1}
+                  keyboardType="numeric"
+                  secureTextEntry
+                  value={confirmNewPin[i] || ''}
+                  onChangeText={(text) => handlePinInput(text, i, 'confirm')}
+                  onKeyPress={(e) => handleKeyPress(e, i, 'confirm')}
+                />
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.button,
+                (newPin.length < 4 || confirmNewPin.length < 4) &&
+                  styles.disabledButton,
+              ]}
+              onPress={resetPin}
+              disabled={newPin.length !== 4 || confirmNewPin.length !== 4}
+            >
+              <Text style={styles.buttonText}>Reset PIN</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
     backgroundColor: '#fff',
   },
+  inner: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+  },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#2c3e50',
+    textAlign: 'center',
+    marginBottom: 10,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 10,
+    color: '#7f8c8d',
     textAlign: 'center',
+    marginBottom: 20,
   },
-  questionText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginVertical: 20,
-    textAlign: 'center',
+  question: {
+    fontSize: 16,
     color: '#333',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontWeight: '600',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    height: 50,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    fontSize: 16,
+    marginBottom: 20,
+    backgroundColor: '#f9f9f9',
   },
   pinContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '60%',
-    marginBottom: 30,
+    justifyContent: 'space-evenly',
+    marginBottom: 20,
   },
   pinInput: {
-    width: 50,
-    height: 50,
+    width: 55,
+    height: 55,
     borderWidth: 1,
     borderColor: '#007AFF',
-    borderRadius: 8,
+    borderRadius: 10,
     textAlign: 'center',
-    fontSize: 20,
-    marginHorizontal: 2,
-  },
-  input: {
-    width: '100%',
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    marginBottom: 20,
+    fontSize: 22,
+    color: '#333',
+    backgroundColor: '#f0f8ff',
   },
   button: {
     backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 8,
-    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 10,
     alignItems: 'center',
-    marginTop: 20,
   },
   disabledButton: {
     backgroundColor: '#ccc',
   },
   buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: '#fff',
+    fontWeight: '600',
     fontSize: 16,
   },
 });

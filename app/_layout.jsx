@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 
 export default function RootLayout() {
+
   return (
     <Stack>
       <Stack.Screen
@@ -16,6 +17,7 @@ export default function RootLayout() {
           title: "Create PIN",
           headerBackTitle: "Back",
           headerBackTitleVisible: true,
+          headerShown : false
         }}
       />
       <Stack.Screen
@@ -48,13 +50,6 @@ export default function RootLayout() {
         name="book/transaction-details"
         options={{
           title: "Transection Details",
-          headerBackTitle: "Back",
-        }}
-      />
-      <Stack.Screen
-        name="settings"
-        options={{
-          title: "Settings",
           headerBackTitle: "Back",
         }}
       />

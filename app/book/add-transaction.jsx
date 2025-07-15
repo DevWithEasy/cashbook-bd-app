@@ -15,6 +15,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useStore } from "../../utils/z-store";
+import { getTransactions } from "../../utils/transactionController";
+import { getBooks } from "../../utils/bookController";
 
 export default function AddTransaction() {
   const router = useRouter();
@@ -29,8 +32,8 @@ export default function AddTransaction() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { addBooks, addTransactions } = useStore();
 
-  // Load categories from database
   useEffect(() => {
     const loadCategories = async () => {
       try {
@@ -49,7 +52,6 @@ export default function AddTransaction() {
         setLoading(false);
       }
     };
-
     loadCategories();
   }, []);
 
@@ -89,11 +91,13 @@ export default function AddTransaction() {
           remark,
           transactionType === "cashin" ? 1 : 0,
           transactionType === "cashout" ? 1 : 0,
-          date.toISOString().split("T")[0], // Format as YYYY-MM-DD
-          date.toTimeString().split(" ")[0], // Format as HH:MM:SS
+          date.toISOString().split("T")[0],
+          date.toTimeString().split(" ")[0],
         ]
       );
+      getTransactions(database, bookId, addTransactions);
       router.back();
+      getBooks(database, addBooks);
     } catch (err) {
       Alert.alert("Error", "Failed to save transaction");
       console.error("Save transaction error:", err);
@@ -103,7 +107,7 @@ export default function AddTransaction() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }
@@ -127,93 +131,82 @@ export default function AddTransaction() {
             title: transactionType === "cashin" ? "Add Income" : "Add Expense",
           }}
         />
-        <View style={styles.formGroup}>
+
+        {/* Amount */}
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>Amount*</Text>
           <TextInput
             style={styles.input}
             placeholder="Enter amount"
+            keyboardType="numeric"
             value={amount}
             onChangeText={setAmount}
-            keyboardType="numeric"
           />
         </View>
 
-        <View style={styles.formGroup}>
+        {/* Category */}
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>Category*</Text>
-          <View style={styles.pickerContainer}>
+          <View style={styles.pickerWrapper}>
             <Picker
               selectedValue={categoryId}
-              onValueChange={(itemValue) => setCategoryId(itemValue)}
-              style={styles.picker}
+              onValueChange={setCategoryId}
+              dropdownIconColor="#007AFF"
             >
-              {categories.map((category) => (
-                <Picker.Item
-                  key={category.id}
-                  label={category.name}
-                  value={category.id}
-                />
+              {categories.map((cat) => (
+                <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
               ))}
             </Picker>
           </View>
         </View>
 
-        <View style={styles.formGroup}>
+        {/* Date & Time */}
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>Date & Time*</Text>
-
-          <View style={styles.datetimeContainer}>
+          <View style={styles.datetimeRow}>
             <TouchableOpacity
-              style={[styles.dateInput, styles.datePart]}
+              style={styles.datetimeButton}
               onPress={() => setShowDatePicker(true)}
             >
-              <Text>{date.toLocaleDateString()}</Text>
-              <Ionicons name="calendar" size={20} color="#555" />
+              <Ionicons name="calendar" size={18} color="#007AFF" />
+              <Text style={styles.datetimeText}>
+                {date.toLocaleDateString()}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.dateInput, styles.timePart]}
+              style={styles.datetimeButton}
               onPress={() => setShowTimePicker(true)}
             >
-              <Text>
-                {date.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+              <Ionicons name="time" size={18} color="#007AFF" />
+              <Text style={styles.datetimeText}>
+                {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </Text>
-              <Ionicons name="time" size={20} color="#555" />
             </TouchableOpacity>
           </View>
 
           {showDatePicker && (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display="default"
-              onChange={handleDateChange}
-            />
+            <DateTimePicker value={date} mode="date" onChange={handleDateChange} />
           )}
-
           {showTimePicker && (
-            <DateTimePicker
-              value={date}
-              mode="time"
-              display="default"
-              onChange={handleTimeChange}
-            />
+            <DateTimePicker value={date} mode="time" onChange={handleTimeChange} />
           )}
         </View>
 
-        <View style={styles.formGroup}>
+        {/* Remark */}
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>Remark</Text>
           <TextInput
-            style={[styles.input, styles.multilineInput]}
-            placeholder="Optional notes"
-            value={remark}
-            onChangeText={setRemark}
+            style={[styles.input, styles.remarkInput]}
+            placeholder="Optional note"
             multiline
             numberOfLines={3}
+            value={remark}
+            onChangeText={setRemark}
           />
         </View>
 
+        {/* Save Button */}
         <TouchableOpacity
           style={[
             styles.saveButton,
@@ -232,78 +225,74 @@ export default function AddTransaction() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: "#f8f9fa",
+    padding: 20,
+    backgroundColor: "#f9fafb",
   },
-  formGroup: {
+  inputGroup: {
     marginBottom: 20,
   },
   label: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: "#555",
+    fontSize: 15,
+    color: "#374151",
+    marginBottom: 6,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
     backgroundColor: "#fff",
-  },
-  multilineInput: {
-    minHeight: 80,
-    textAlignVertical: "top",
-  },
-  pickerContainer: {
+    padding: 14,
+    borderRadius: 10,
+    fontSize: 16,
+    borderColor: "#e5e7eb",
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
+  },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 10,
     overflow: "hidden",
     backgroundColor: "#fff",
   },
-  picker: {
-    height: 50,
-  },
-  datetimeContainer: {
+  datetimeRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 12,
   },
-  dateInput: {
+  datetimeButton: {
+    flex: 1,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
     backgroundColor: "#fff",
+    borderColor: "#e5e7eb",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 10,
   },
-  datePart: {
-    width: "60%",
+  datetimeText: {
+    fontSize: 16,
+    color: "#111827",
   },
-  timePart: {
-    width: "35%",
+  remarkInput: {
+    minHeight: 80,
+    textAlignVertical: "top",
   },
   saveButton: {
     backgroundColor: "#007AFF",
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: "center",
-    marginTop: 20,
   },
   disabledButton: {
-    backgroundColor: "#a0a0a0",
+    backgroundColor: "#9ca3af",
   },
   saveButtonText: {
-    color: "white",
-    fontWeight: "bold",
+    color: "#fff",
     fontSize: 16,
+    fontWeight: "600",
   },
   errorText: {
-    fontSize: 16,
-    color: "#F44336",
     textAlign: "center",
-    marginTop: 20,
+    color: "#f43f5e",
+    fontSize: 16,
   },
 });

@@ -9,8 +9,8 @@ export default function CustomDrawerContent(props) {
           source={require('../assets/images/logo.png')}
           style={styles.logo}
         />
-        <Text style={styles.appName}>HisabiFy Pro</Text>
-        <Text style={styles.appTagline}>Your Finance Manager</Text>
+        <Text style={styles.appName}>CashBook BD</Text>
+        <Text style={styles.appTagline}>Your Personal Finance Manager</Text>
       </View>
       <DrawerItemList {...props} />
     </DrawerContentScrollView>

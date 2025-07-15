@@ -6,70 +6,103 @@ import { router } from 'expo-router';
 export default function WellCome() {
   const [loading, setLoading] = useState(false);
 
-  const initializeDatabase = async () => {
-    setLoading(true);
+const initializeDatabase = async () => {
+  setLoading(true);
+  
+  try {
+    const db = await SQLite.openDatabaseAsync('cashmate.db');
     
-    try {
-      const db = await SQLite.openDatabaseAsync('cashmate.db');
+    // Execute all SQL commands in sequence
+    await db.execAsync(`
+      PRAGMA journal_mode = WAL;
       
-      // Execute all SQL commands in sequence
-      await db.execAsync(`
-        PRAGMA journal_mode = WAL;
-        
-        CREATE TABLE IF NOT EXISTS books (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL
-        );
-        
-        CREATE TABLE IF NOT EXISTS categories (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL UNIQUE,
-          is_default BOOLEAN DEFAULT FALSE
-        );
-        
-        CREATE TABLE IF NOT EXISTS transactions (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          date TEXT NOT NULL,
-          time TEXT NOT NULL,
-          book_id INTEGER NOT NULL,
-          cat_id INTEGER NOT NULL,
-          amount REAL NOT NULL,
-          remark TEXT,
-          cashin BOOLEAN NOT NULL,
-          cashout BOOLEAN NOT NULL,
-          FOREIGN KEY (book_id) REFERENCES books (id),
-          FOREIGN KEY (cat_id) REFERENCES categories (id)
-        );
-        
-        INSERT INTO books (name) SELECT 'Default Book' 
-        WHERE NOT EXISTS (SELECT 1 FROM books);
-        
-        -- Insert default categories with is_default = TRUE
-        INSERT INTO categories (name, is_default) SELECT 'Food', TRUE 
-        WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Food');
-        
-        INSERT INTO categories (name, is_default) SELECT 'Transport', TRUE 
-        WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Transport');
-        
-        INSERT INTO categories (name, is_default) SELECT 'Salary', TRUE 
-        WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Salary');
-        
-        INSERT INTO categories (name, is_default) SELECT 'Shopping', TRUE 
-        WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Shopping');
-        
-        INSERT INTO categories (name, is_default) SELECT 'Others', TRUE 
-        WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Others');
-      `);
+      CREATE TABLE IF NOT EXISTS books (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        last_updated TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        is_default BOOLEAN DEFAULT FALSE
+      );
+      
+      CREATE TABLE IF NOT EXISTS transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        time TEXT NOT NULL,
+        book_id INTEGER NOT NULL,
+        cat_id INTEGER NOT NULL,
+        amount REAL NOT NULL,
+        remark TEXT,
+        cashin BOOLEAN NOT NULL,
+        cashout BOOLEAN NOT NULL,
+        FOREIGN KEY (book_id) REFERENCES books (id),
+        FOREIGN KEY (cat_id) REFERENCES categories (id)
+      );
+      
+      -- Create trigger to update book's last_updated when book name is changed
+      CREATE TRIGGER IF NOT EXISTS update_book_on_name_change
+      AFTER UPDATE OF name ON books
+      BEGIN
+        UPDATE books SET last_updated = CURRENT_TIMESTAMP 
+        WHERE id = NEW.id;
+      END;
+      
+      -- Create trigger to update book's last_updated when transaction is added
+      CREATE TRIGGER IF NOT EXISTS update_book_on_transaction_insert
+      AFTER INSERT ON transactions
+      BEGIN
+        UPDATE books SET last_updated = CURRENT_TIMESTAMP 
+        WHERE id = NEW.book_id;
+      END;
+      
+      -- Create trigger to update book's last_updated when transaction is updated
+      CREATE TRIGGER IF NOT EXISTS update_book_on_transaction_update
+      AFTER UPDATE ON transactions
+      BEGIN
+        UPDATE books SET last_updated = CURRENT_TIMESTAMP 
+        WHERE id = NEW.book_id;
+      END;
+      
+      -- Create trigger to update book's last_updated when transaction is deleted
+      CREATE TRIGGER IF NOT EXISTS update_book_on_transaction_delete
+      AFTER DELETE ON transactions
+      BEGIN
+        UPDATE books SET last_updated = CURRENT_TIMESTAMP 
+        WHERE id = OLD.book_id;
+      END;
+      
+      INSERT INTO books (name) SELECT 'Default Book' 
+      WHERE NOT EXISTS (SELECT 1 FROM books);
+      
+      -- Insert default categories with is_default = TRUE
+      INSERT INTO categories (name, is_default) SELECT 'Food', TRUE 
+      WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Food');
+      
+      INSERT INTO categories (name, is_default) SELECT 'Transport', TRUE 
+      WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Transport');
+      
+      INSERT INTO categories (name, is_default) SELECT 'Salary', TRUE 
+      WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Salary');
+      
+      INSERT INTO categories (name, is_default) SELECT 'Shopping', TRUE 
+      WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Shopping');
+      
+      INSERT INTO categories (name, is_default) SELECT 'Others', TRUE 
+      WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Others');
+    `);
 
-      console.log('Database initialized successfully');
-      router.replace('/main');
-    } catch (error) {
-      console.error('Database initialization error:', error);
-      Alert.alert('Error', 'Failed to initialize database. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    console.log('Database initialized successfully');
+    router.replace('/main');
+  } catch (error) {
+    console.error('Database initialization error:', error);
+    Alert.alert('Error', 'Failed to initialize database. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <View style={styles.container}>
@@ -91,6 +124,11 @@ export default function WellCome() {
           <View style={styles.featureItem}>
             <Text style={styles.featureIcon}>💰</Text>
             <Text style={styles.featureText}>Track Income/Expenses</Text>
+          </View>
+
+          <View style={styles.featureItem}>
+            <Text style={styles.featureIcon}>🧾</Text>
+            <Text style={styles.featureText}>Generate PDF Book Transactions</Text>
           </View>
         </View>
       </View>
