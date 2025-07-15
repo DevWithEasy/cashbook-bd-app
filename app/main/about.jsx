@@ -1,37 +1,41 @@
-import { View, Text, StyleSheet, ScrollView, Image, Linking, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-
+import { Ionicons } from "@expo/vector-icons";
+import {
+  Image,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function About() {
   const openWebsite = () => {
-    Linking.openURL('https://devwitheasy.vercel.app');
+    Linking.openURL("https://devwitheasy.vercel.app");
   };
 
   const contactSupport = () => {
-    Linking.openURL('mailto:robiulawal68@gmail.com');
+    Linking.openURL("mailto:robiulawal68@gmail.com");
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <LinearGradient
-              colors={['#007AFF', '#0047AB']}
-              style={styles.header}
-            >
+      <View style={styles.header}>
         <Image
-          source={require('../../assets/images/logo.png')}
+          source={require("../../assets/images/logo.png")}
           style={styles.logo}
         />
         <Text style={styles.appName}>CashBook BD</Text>
         <Text style={styles.appVersion}>Version 1.0.0</Text>
-      </LinearGradient>
+      </View>
 
       <View style={styles.content}>
         <Text style={styles.heading}>About The App</Text>
         <Text style={styles.description}>
-          CashBook BD is your personal finance manager designed to help you track expenses, 
-          manage budgets, and achieve your financial goals. With intuitive features and 
-          powerful analytics, take control of your money like never before.
+          CashBook BD is your personal finance manager designed to help you
+          track expenses, manage budgets, and achieve your financial goals. With
+          intuitive features and powerful analytics, take control of your money
+          like never before.
         </Text>
 
         <View style={styles.featuresContainer}>
@@ -61,17 +65,14 @@ export default function About() {
 
         <View style={styles.contactContainer}>
           <Text style={styles.contactHeading}>Contact Us</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.contactButton}
             onPress={contactSupport}
           >
             <Ionicons name="mail-outline" size={20} color="white" />
             <Text style={styles.contactButtonText}>Email Support</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.contactButton}
-            onPress={openWebsite}
-          >
+          <TouchableOpacity style={styles.contactButton} onPress={openWebsite}>
             <Ionicons name="globe-outline" size={20} color="white" />
             <Text style={styles.contactButtonText}>Visit Website</Text>
           </TouchableOpacity>
@@ -92,54 +93,53 @@ const styles = StyleSheet.create({
   header: {
     paddingVertical: 30,
     paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 20,
+    backgroundColor: "#007AFF",
   },
   logo: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     padding: 10,
     marginBottom: 15,
   },
   appName: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: "bold",
+    color: "white",
     marginBottom: 5,
   },
   appVersion: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
+    color: "rgba(255,255,255,0.8)",
   },
   content: {
     padding: 20,
   },
   heading: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    fontWeight: "bold",
+    color: "#2c3e50",
     marginBottom: 15,
     marginTop: 10,
   },
   description: {
     fontSize: 16,
     lineHeight: 24,
-    color: '#34495e',
+    color: "#34495e",
     marginBottom: 25,
   },
   featuresContainer: {
     marginBottom: 30,
   },
   featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 15,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     padding: 15,
     borderRadius: 10,
     elevation: 2,
@@ -147,10 +147,10 @@ const styles = StyleSheet.create({
   featureText: {
     fontSize: 16,
     marginLeft: 15,
-    color: '#2c3e50',
+    color: "#2c3e50",
   },
   contactContainer: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 10,
     padding: 20,
     marginTop: 10,
@@ -158,29 +158,29 @@ const styles = StyleSheet.create({
   },
   contactHeading: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    fontWeight: "bold",
+    color: "#2c3e50",
     marginBottom: 15,
   },
   contactButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#007AFF',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#007AFF",
     padding: 15,
     borderRadius: 8,
     marginBottom: 10,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   contactButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginLeft: 10,
   },
   copyright: {
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 30,
-    color: '#7f8c8d',
+    color: "#7f8c8d",
     fontSize: 14,
   },
 });

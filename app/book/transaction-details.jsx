@@ -15,15 +15,19 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import TransactionTransferModal from "../../components/TransactionTransferModal";
 import { getTransactions } from "../../utils/transactionController";
 import { useStore } from "../../utils/z-store";
+import { getBooks } from "../../utils/bookController";
 
 export default function TransactionDetails() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const transaction = params.transaction ? JSON.parse(params.transaction) : null;
-  const { addTransactions } = useStore();
+  const transaction = params.transaction
+    ? JSON.parse(params.transaction)
+    : null;
+  const { addTransactions,addBooks,books } = useStore();
 
   // Form states
   const [amount, setAmount] = useState(transaction?.amount.toString() || "");
@@ -38,8 +42,9 @@ export default function TransactionDetails() {
   const [selectedCategory, setSelectedCategory] = useState(
     transaction?.cat_id || null
   );
-  const [books, setBooks] = useState([]);
-  const [selectedBook, setSelectedBook] = useState(transaction?.book_id || null);
+  const [selectedBook, setSelectedBook] = useState(
+    transaction?.book_id || null
+  );
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [currentBookName, setCurrentBookName] = useState("");
 
@@ -61,7 +66,7 @@ export default function TransactionDetails() {
 
         // Load books
         const bookResults = await db.getAllAsync("SELECT id, name FROM books");
-        setBooks(bookResults);
+        addBooks(bookResults);
 
         // Get current book name
         if (transaction?.book_id) {
@@ -81,12 +86,18 @@ export default function TransactionDetails() {
 
   const handleUpdate = async () => {
     if (!amount.trim()) {
-      Alert.alert("Error", "Amount cannot be empty");
+      Toast.show({
+        type: "error",
+        text1: "Amount cannot be empty",
+      });
       return;
     }
 
     if (!selectedCategory) {
-      Alert.alert("Error", "Please select a category");
+      Toast.show({
+        type: "error",
+        text1: "Please select a category",
+      });
       return;
     }
 
@@ -103,11 +114,18 @@ export default function TransactionDetails() {
           transaction.id,
         ]
       );
-      await getTransactions(db, transaction?.book_id, addTransactions);
-      Alert.alert("Success", "Transaction updated successfully");
+      getTransactions(db, transaction?.book_id, addTransactions);
+      getBooks(db,addBooks)
+      Toast.show({
+        type: "success",
+        text1: "Transaction updated successfully",
+      });
       router.back();
     } catch (error) {
-      Alert.alert("Error", "Failed to update transaction");
+      Toast.show({
+        type: "error",
+        text1: "Failed to update transaction",
+      });
       console.error(error);
     }
   };
@@ -127,11 +145,18 @@ export default function TransactionDetails() {
               await db.runAsync("DELETE FROM transactions WHERE id = ?", [
                 transaction.id,
               ]);
-              await getTransactions(db, transaction?.book_id, addTransactions);
-              Alert.alert("Success", "Transaction deleted successfully");
+              getTransactions(db, transaction?.book_id, addTransactions);
+              getBooks(db,addBooks)
+              Toast.show({
+                type: "success",
+                text1: "Transaction deleted successfully",
+              });
               router.back();
             } catch (error) {
-              Alert.alert("Error", "Failed to delete transaction");
+              Toast.show({
+                type: "error",
+                text1: "Failed to delete transaction",
+              });
               console.error(error);
             }
           },

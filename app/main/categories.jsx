@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as SQLite from "expo-sqlite";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   StyleSheet,
@@ -9,8 +10,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import CreateCategoryModal from "../../components/CreateCategoryModal";
 
 export default function Categories() {
@@ -31,7 +32,10 @@ export default function Categories() {
         setDb(database);
         await loadCategories(database);
       } catch (error) {
-        Alert.alert("Error", "Failed to initialize database");
+        Toast.show({
+        type: "error",
+        text1: "Failed to initialize database",
+      });
         console.error("Database error:", error);
       } finally {
         setLoading(false);
@@ -54,17 +58,25 @@ export default function Categories() {
 
   const loadCategories = async (database) => {
     try {
-      const results = await database.getAllAsync("SELECT * FROM categories ORDER BY name ASC");
+      const results = await database.getAllAsync(
+        "SELECT * FROM categories ORDER BY name ASC"
+      );
       setCategories(results);
     } catch (error) {
-      Alert.alert("Error", "Failed to load categories");
+      Toast.show({
+        type: "error",
+        text1: "Failed to load categories",
+      });
       console.error("Load categories error:", error);
     }
   };
 
   const handleAddCategory = async () => {
     if (!newCategory.trim()) {
-      Alert.alert("Error", "Category name cannot be empty");
+      Toast.show({
+        type: "error",
+        text1: "Category name cannot be empty",
+      });
       return;
     }
 
@@ -74,20 +86,38 @@ export default function Categories() {
         [newCategory]
       );
       if (existing) {
-        Alert.alert("Error", `"${newCategory}" already exists.`);
+        Toast.show({
+          type: "error",
+          text1: `"${newCategory}" already exists.`,
+        });
         return;
       }
 
       if (editCategory) {
         if (editCategory.name === "Others") {
-          Alert.alert("Error", "'Others' category can't be modified");
+          Toast.show({
+            type: "error",
+            text1: "'Others' category can't be modified",
+          });
           return;
         }
-        await db.runAsync("UPDATE categories SET name = ? WHERE id = ?", [newCategory, editCategory.id]);
-        Alert.alert("Success", "Category updated");
+        await db.runAsync("UPDATE categories SET name = ? WHERE id = ?", [
+          newCategory,
+          editCategory.id,
+        ]);
+        Toast.show({
+          type: "success",
+          text1: "Category updated",
+        });
       } else {
-        await db.runAsync("INSERT INTO categories (name, is_default) VALUES (?, ?)", [newCategory, false]);
-        Alert.alert("Success", "Category added");
+        await db.runAsync(
+          "INSERT INTO categories (name, is_default) VALUES (?, ?)",
+          [newCategory, false]
+        );
+        Toast.show({
+          type: "success",
+          text1: "Category added",
+        });
       }
 
       setModalVisible(false);
@@ -96,13 +126,20 @@ export default function Categories() {
       await loadCategories(db);
     } catch (error) {
       Alert.alert("Error", "Failed to save category");
+      Toast.show({
+          type: "error",
+          text1: "Failed to save category",
+        });
       console.error("Save error:", error);
     }
   };
 
   const handleEdit = (cat) => {
     if (cat.name === "Others") {
-      Alert.alert("Error", "'Others' category can't be edited");
+      Toast.show({
+        type: "error",
+        text1: "Others' category can't be edited",
+      });
       return;
     }
     setEditCategory(cat);
@@ -127,15 +164,34 @@ export default function Categories() {
 
   const deleteCategory = async (id) => {
     try {
-      const others = await db.getFirstAsync("SELECT id FROM categories WHERE name = 'Others'");
-      if (!others) return Alert.alert("Error", "'Others' category not found");
+      const others = await db.getFirstAsync(
+        "SELECT id FROM categories WHERE name = 'Others'"
+      );
+      if (!others) {
+        Toast.show({
+          type: "error",
+          text1: "'Others' category not found",
+        });
+        return;
+      }
 
-      await db.runAsync("UPDATE transactions SET cat_id = ? WHERE cat_id = ?", [others.id, id]);
+      await db.runAsync("UPDATE transactions SET cat_id = ? WHERE cat_id = ?", [
+        others.id,
+        id,
+      ]);
       await db.runAsync("DELETE FROM categories WHERE id = ?", [id]);
-      Alert.alert("Deleted", "Category deleted successfully");
+
+      Toast.show({
+        type: "success",
+        text1: "Category deleted successfully",
+      });
+
       await loadCategories(db);
     } catch (error) {
-      Alert.alert("Error", "Failed to delete category");
+      Toast.show({
+        type: "error",
+        text1: "Failed to delete category",
+      });
       console.error("Delete error:", error);
     }
   };
@@ -190,7 +246,9 @@ export default function Categories() {
           <View style={styles.emptyState}>
             <Ionicons name="folder-open-outline" size={48} color="#ccc" />
             <Text style={styles.emptyText}>
-              {searchQuery ? "No matching categories found" : "No categories yet"}
+              {searchQuery
+                ? "No matching categories found"
+                : "No categories yet"}
             </Text>
           </View>
         )}

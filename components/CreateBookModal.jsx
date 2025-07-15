@@ -1,13 +1,13 @@
 import { useState } from "react";
 import {
-  Alert,
   Modal,
   StyleSheet,
   Text,
-  TouchableOpacity,
-  View,
   TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
+import Toast from "react-native-toast-message";
 import { useStore } from "../utils/z-store";
 
 export default function CreateBookModal({
@@ -21,7 +21,10 @@ export default function CreateBookModal({
 
   const createBook = async () => {
     if (!newBookName.trim()) {
-      Alert.alert("Error", "Please enter a book name");
+      Toast.show({
+        type: "error",
+        text1: "Please enter a book name",
+      });
       return;
     }
 
@@ -31,17 +34,30 @@ export default function CreateBookModal({
       await db.runAsync("INSERT INTO books (name) VALUES (?)", [
         newBookName.trim(),
       ]);
+
       const results = await db.getAllAsync(
         "SELECT * FROM books ORDER BY name ASC"
       );
+
       addBooks(results);
       setModalVisible(false);
       setNewBookName("");
+
+      Toast.show({
+        type: "success",
+        text1: "Book created successfully!",
+      });
     } catch (error) {
       if (error.message.includes("UNIQUE constraint failed")) {
-        Alert.alert("Error", "A book with this name already exists");
+        Toast.show({
+          type: "error",
+          text1: "A book with this name already exists",
+        });
       } else {
-        Alert.alert("Error", "Failed to create book");
+        Toast.show({
+          type: "error",
+          text1: "Failed to create book",
+        });
         console.error("Create book error:", error);
       }
     }

@@ -1,24 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   StyleSheet,
   Text,
-  TouchableOpacity,
-  View,
   TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
+import Toast from "react-native-toast-message";
+import BookUpdateModal from "../../c../../components/BookUpdateModal";
+import BookBalanceSummery from "../../components/BookBalanceSummery";
 import BookMenu from "../../components/BookMenu";
 import TransactionButton from "../../components/TransactionButton";
 import TransactionItem from "../../components/TransactionItem";
-import BookUpdateModal from "../../c../../components/BookUpdateModal"
+import { getBooks } from "../../utils/bookController";
 import { initDb } from "../../utils/initDB";
 import { fetchTransactions } from "../../utils/transactionController";
-import BookBalanceSummery from "../../components/BookBalanceSummery";
-import { getBooks } from "../../utils/bookController";
 import { useStore } from "../../utils/z-store";
 
 export default function BookDetails() {
@@ -79,7 +79,10 @@ export default function BookDetails() {
 
   const updateBookName = async () => {
     if (!newBookName.trim()) {
-      Alert.alert("Error", "Book name cannot be empty");
+      Toast.show({
+        type: "error",
+        text1: "Book name cannot be empty",
+      });
       return;
     }
 
@@ -91,9 +94,15 @@ export default function BookDetails() {
       setEditModalVisible(false);
       book.name = newBookName;
       getBooks(db,addBooks)
-      Alert.alert("Success", "Book name updated successfully");
+      Toast.show({
+        type: "success",
+        text1: "Book name updated successfully",
+      });
     } catch (err) {
-      Alert.alert("Error", "Failed to update book name");
+      Toast.show({
+        type: "error",
+        text1: "Failed to update book name",
+      });
       console.error(err);
     }
   };

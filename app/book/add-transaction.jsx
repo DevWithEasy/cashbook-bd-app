@@ -6,18 +6,18 @@ import * as SQLite from "expo-sqlite";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
-import { useStore } from "../../utils/z-store";
-import { getTransactions } from "../../utils/transactionController";
+import Toast from "react-native-toast-message";
 import { getBooks } from "../../utils/bookController";
+import { getTransactions } from "../../utils/transactionController";
+import { useStore } from "../../utils/z-store";
 
 export default function AddTransaction() {
   const router = useRouter();
@@ -74,7 +74,10 @@ export default function AddTransaction() {
 
   const handleSave = async () => {
     if (!amount || !categoryId) {
-      Alert.alert("Error", "Please fill all required fields");
+      Toast.show({
+        type: "error",
+        text1: "Please fill all required fields",
+      });
       return;
     }
 
@@ -99,7 +102,10 @@ export default function AddTransaction() {
       router.back();
       getBooks(database, addBooks);
     } catch (err) {
-      Alert.alert("Error", "Failed to save transaction");
+      Toast.show({
+        type: "error",
+        text1: "Failed to save transaction",
+      });
       console.error("Save transaction error:", err);
     }
   };
@@ -180,16 +186,27 @@ export default function AddTransaction() {
             >
               <Ionicons name="time" size={18} color="#007AFF" />
               <Text style={styles.datetimeText}>
-                {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                {date.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </Text>
             </TouchableOpacity>
           </View>
 
           {showDatePicker && (
-            <DateTimePicker value={date} mode="date" onChange={handleDateChange} />
+            <DateTimePicker
+              value={date}
+              mode="date"
+              onChange={handleDateChange}
+            />
           )}
           {showTimePicker && (
-            <DateTimePicker value={date} mode="time" onChange={handleTimeChange} />
+            <DateTimePicker
+              value={date}
+              mode="time"
+              onChange={handleTimeChange}
+            />
           )}
         </View>
 

@@ -1,15 +1,17 @@
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Alert,
-} from "react-native";
-import React from "react";
 import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
 import * as SQLite from "expo-sqlite";
+import {
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
+import Toast from "react-native-toast-message";
+import { getBooks } from "../utils/bookController";
+import { getTransactions } from "../utils/transactionController";
+import { useStore } from "../utils/z-store";
 
 export default function TransactionTransferModal({
   showTransferModal,
@@ -21,12 +23,13 @@ export default function TransactionTransferModal({
   transaction,
 }) {
   const router = useRouter();
+  const { addBooks, addTransactions } = useStore();
 
   const handleTransfer = async () => {
-    if (!selectedBook) {
-      Alert.alert("Error", "Please select a book to transfer to");
-      return;
-    }
+    Toast.show({
+      type: "error",
+      text1: "Please select a book to transfer to",
+    });
 
     try {
       const db = await SQLite.openDatabaseAsync("cashmate.db");
@@ -34,11 +37,19 @@ export default function TransactionTransferModal({
         selectedBook,
         transaction.id,
       ]);
-      Alert.alert("Success", "Transaction transferred successfully");
+      Toast.show({
+        type: "success",
+        text1: "Transaction transferred successfully",
+      });
       setShowTransferModal(false);
+      getTransactions(db, transaction.book_id, addTransactions);
+      getBooks(db, addBooks);
       router.back();
     } catch (error) {
-      Alert.alert("Error", "Failed to transfer transaction");
+      Toast.show({
+        type: "error",
+        text1: "Failed to transfer transaction",
+      });
       console.error(error);
     }
   };
@@ -47,7 +58,6 @@ export default function TransactionTransferModal({
     setShowTransferModal(false);
     setSelectedBook(null);
   };
-
   return (
     <Modal
       visible={showTransferModal}
@@ -59,7 +69,9 @@ export default function TransactionTransferModal({
         <View style={styles.card}>
           <Text style={styles.title}>Transfer Transaction</Text>
           <Text style={styles.subtitle}>
-            Move this transaction from <Text style={styles.highlight}>{currentBookName}</Text> to:
+            Move this transaction from{"\n"}
+            <Text style={styles.highlight}>{currentBookName}</Text> ⇆ 
+            <Text style={styles.highlight}>{books.find(book=>book.id===selectedBook)?.name}</Text>
           </Text>
 
           <View style={styles.pickerWrapper}>
@@ -73,7 +85,11 @@ export default function TransactionTransferModal({
               {books
                 .filter((book) => book.id !== transaction.book_id)
                 .map((book) => (
-                  <Picker.Item key={book.id} label={book.name} value={book.id} />
+                  <Picker.Item
+                    key={book.id}
+                    label={book.name}
+                    value={book.id}
+                  />
                 ))}
             </Picker>
           </View>
@@ -123,14 +139,13 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "600",
     color: "#1f2937",
     marginBottom: 12,
     textAlign: "center",
   },
   subtitle: {
-    fontSize: 15,
     color: "#4b5563",
     marginBottom: 16,
     textAlign: "center",
@@ -174,11 +189,9 @@ const styles = StyleSheet.create({
   cancelText: {
     color: "#374151",
     fontWeight: "500",
-    fontSize: 15,
   },
   transferText: {
     color: "#fff",
     fontWeight: "600",
-    fontSize: 15,
   },
 });

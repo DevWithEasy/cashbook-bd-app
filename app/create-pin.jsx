@@ -1,18 +1,19 @@
-import { useState, useRef, useEffect } from "react";
-import {
-  Text,
-  View,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Animated,
-  Easing
-} from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { router } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from "react-native";
+import Toast from "react-native-toast-message";
 import { saveData } from "../utils/localData";
 
 export default function CreatePin() {
@@ -92,7 +93,10 @@ export default function CreatePin() {
 
   const handleSubmit = async () => {
     if (!securityAnswer) {
-      Alert.alert("Error", "Please provide an answer to your security question");
+      Toast.show({
+        type: "error",
+        text1: "Please provide an answer to your security question",
+      });
       return;
     }
 
@@ -102,10 +106,16 @@ export default function CreatePin() {
       await saveData("securityAnswer", securityAnswer);
       await saveData("isFirst", "false");
 
-      Alert.alert("Success", "PIN setup completed successfully");
+      Toast.show({
+        type: "success",
+        text1: "PIN setup completed successfully",
+      });
       router.replace("/welcome");
     } catch (error) {
-      Alert.alert("Error", "Failed to save PIN. Please try again.");
+      Toast.show({
+        type: "error",
+        text1: "Failed to save PIN. Please try again.",
+      });
       console.log(error);
     }
   };

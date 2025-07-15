@@ -1,7 +1,8 @@
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import React, { useState } from 'react';
-import * as SQLite from 'expo-sqlite';
 import { router } from 'expo-router';
+import * as SQLite from 'expo-sqlite';
+import { useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Toast from 'react-native-toast-message';
 
 export default function WellCome() {
   const [loading, setLoading] = useState(false);
@@ -94,11 +95,17 @@ const initializeDatabase = async () => {
       WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Others');
     `);
 
-    console.log('Database initialized successfully');
+    Toast.show({
+        type: "success",
+        text1: "Database initialized successfully",
+      });
     router.replace('/main');
   } catch (error) {
     console.error('Database initialization error:', error);
-    Alert.alert('Error', 'Failed to initialize database. Please try again.');
+    Toast.show({
+        type: "error",
+        text1: "Failed to initialize database. Please try again.",
+      });
   } finally {
     setLoading(false);
   }

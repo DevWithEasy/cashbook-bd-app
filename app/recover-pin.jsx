@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { getData, saveData } from '../utils/localData';
 
 export default function RecoverPin() {
@@ -74,7 +75,10 @@ export default function RecoverPin() {
 
   const verifySecurityAnswer = () => {
     if (!storedAnswer) {
-      Alert.alert('Error', 'Security info not found. Please reinstall or contact support.');
+      Toast.show({
+        type: "error",
+        text1: "Security info not found. Please reinstall or contact support.",
+      });
       return;
     }
 
@@ -83,7 +87,10 @@ export default function RecoverPin() {
       setNewPin('');
       setConfirmNewPin('');
     } else {
-      Alert.alert('Incorrect', 'Your answer did not match.');
+      Toast.show({
+        type: "error",
+        text1: "Your answer did not match.",
+      });
       setSecurityAnswer('');
       securityAnswerRef.current?.focus();
     }
@@ -96,7 +103,10 @@ export default function RecoverPin() {
     }
 
     if (newPin !== confirmNewPin) {
-      Alert.alert('Error', 'PINs do not match');
+      Toast.show({
+        type: "error",
+        text1: "PINs do not match",
+      });
       setConfirmNewPin('');
       confirmNewPinInputs.current[0]?.focus();
       return;
@@ -104,10 +114,16 @@ export default function RecoverPin() {
 
     try {
       await saveData('appPin', newPin);
-      Alert.alert('Success', 'PIN reset successful');
+      Toast.show({
+        type: "Success",
+        text1: "PIN reset successful",
+      });
       router.replace('/login');
     } catch (e) {
-      Alert.alert('Error', 'Could not reset PIN');
+      Toast.show({
+        type: "error",
+        text1: "Could not reset PIN",
+      });
     }
   };
 

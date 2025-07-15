@@ -1,6 +1,5 @@
-import { View, Text, ScrollView, StyleSheet, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function Privacy() {
   const contactPrivacy = () => {
@@ -9,14 +8,13 @@ export default function Privacy() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <LinearGradient
-        colors={['#007AFF', '#0047AB']}
+      <View
         style={styles.header}
       >
         <Ionicons name="shield-checkmark" size={40} color="white" />
         <Text style={styles.headerTitle}>Privacy Policy</Text>
         <Text style={styles.headerSubtitle}>Last Updated: {new Date().toLocaleDateString()}</Text>
-      </LinearGradient>
+      </View>
 
       <View style={styles.content}>
         <Text style={styles.sectionTitle}>1. Information We Collect</Text>
@@ -90,9 +88,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
     marginBottom: 20,
+    backgroundColor : '#007AFF'
   },
   headerTitle: {
     fontSize: 24,
