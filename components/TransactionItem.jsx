@@ -33,13 +33,24 @@ export default function TransactionItem({ transaction, runningBalance }) {
       <View>
         {/* First Row */}
         <View style={styles.firstRow}>
-          <View style={[styles.categoryContainer, { backgroundColor: categoryColor }]}>
-            <Text style={styles.categoryText} numberOfLines={1} ellipsizeMode="tail">
+          <View
+            style={[
+              styles.categoryContainer,
+              { backgroundColor: categoryColor },
+            ]}
+          >
+            <Text
+              style={styles.categoryText}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {transaction.category_name || "Uncategorized"}
             </Text>
           </View>
 
-          <Text style={transaction.cashin ? styles.incomeText : styles.expenseText}>
+          <Text
+            style={transaction.cashin ? styles.incomeText : styles.expenseText}
+          >
             {transaction.amount.toLocaleString()}
           </Text>
         </View>
@@ -53,7 +64,11 @@ export default function TransactionItem({ transaction, runningBalance }) {
 
         {/* Remark */}
         {transaction.remark && (
-          <Text style={styles.remarkText} numberOfLines={1} ellipsizeMode="tail">
+          <Text
+            style={styles.remarkText}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {transaction.remark}
           </Text>
         )}
@@ -91,10 +106,12 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   incomeText: {
+    fontSize: 16,
     fontWeight: "bold",
     color: "#4CAF50",
   },
   expenseText: {
+    fontSize: 16,
     fontWeight: "bold",
     color: "#F44336",
   },

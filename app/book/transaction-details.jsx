@@ -164,11 +164,7 @@ export default function TransactionDetails() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Text style={styles.currentBook}>Current Book: {currentBookName}</Text>
-
-        {/* Transaction Type */}
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Transaction Type*</Text>
           <View style={styles.toggleGroup}>
             <TouchableOpacity
               style={[styles.toggleButton, type === "cashin" && styles.activeButtonIn]}
@@ -286,12 +282,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8f9fa" },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContainer: { padding: 16, paddingBottom: 100 },
-  currentBook: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#555",
-    marginBottom: 15,
-  },
   formGroup: { marginBottom: 20 },
   label: { fontSize: 16, marginBottom: 8, color: "#555", fontWeight: "bold" },
   input: {

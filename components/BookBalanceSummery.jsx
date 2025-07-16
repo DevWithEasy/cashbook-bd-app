@@ -60,14 +60,17 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     color: "#333",
+    fontSize : 16,
   },
   summaryValue: {
     fontWeight: "bold",
   },
     incomeText: {
     color: "#4CAF50",
+    fontSize : 16,
   },
   expenseText: {
     color: "#F44336",
+    fontSize : 16,
   },
 });
