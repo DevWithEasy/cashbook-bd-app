@@ -8,7 +8,6 @@
     "scheme": "cashbookbd",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "fonts": [],
     "ios": {
       "supportsTablet": true
     },
