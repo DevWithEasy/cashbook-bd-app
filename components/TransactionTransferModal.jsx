@@ -1,12 +1,11 @@
 import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
-import * as SQLite from "expo-sqlite";
 import {
   Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { getBooks } from "../utils/bookController";
@@ -23,27 +22,40 @@ export default function TransactionTransferModal({
   transaction,
 }) {
   const router = useRouter();
-  const { addBooks, addTransactions } = useStore();
+  const { db, setDb, addBooks, addTransactions } = useStore();
 
   const handleTransfer = async () => {
-    Toast.show({
-      type: "error",
-      text1: "Please select a book to transfer to",
-    });
+    if (!selectedBook) {
+      Toast.show({
+        type: "error",
+        text1: "Please select a book to transfer to",
+      });
+      return;
+    }
 
     try {
-      const db = await SQLite.openDatabaseAsync("cashmate.db");
-      await db.runAsync("UPDATE transactions SET book_id = ? WHERE id = ?", [
-        selectedBook,
-        transaction.id,
-      ]);
+      let database = db;
+      if (!database) {
+        const SQLite = await import("expo-sqlite");
+        database = await SQLite.openDatabaseAsync("cashbookbd.db");
+        setDb(database);
+        return; // wait until next render with db
+      }
+
+      await database.runAsync(
+        "UPDATE transactions SET book_id = ? WHERE id = ?",
+        [selectedBook, transaction.id]
+      );
+
+      await getTransactions(database, transaction.book_id, addTransactions);
+      await getBooks(database, addBooks);
+
       Toast.show({
         type: "success",
         text1: "Transaction transferred successfully",
       });
+
       setShowTransferModal(false);
-      getTransactions(db, transaction.book_id, addTransactions);
-      getBooks(db, addBooks);
       router.back();
     } catch (error) {
       Toast.show({
@@ -58,6 +70,7 @@ export default function TransactionTransferModal({
     setShowTransferModal(false);
     setSelectedBook(null);
   };
+
   return (
     <Modal
       visible={showTransferModal}
@@ -70,8 +83,10 @@ export default function TransactionTransferModal({
           <Text style={styles.title}>Transfer Transaction</Text>
           <Text style={styles.subtitle}>
             Move this transaction from{"\n"}
-            <Text style={styles.highlight}>{currentBookName}</Text> ⇆ 
-            <Text style={styles.highlight}>{books.find(book=>book.id===selectedBook)?.name}</Text>
+            <Text style={styles.highlight}>{currentBookName}</Text> ⇆{" "}
+            <Text style={styles.highlight}>
+              {books.find((book) => book.id === selectedBook)?.name}
+            </Text>
           </Text>
 
           <View style={styles.pickerWrapper}>

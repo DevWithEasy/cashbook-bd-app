@@ -14,7 +14,6 @@ export default function CreateBookModal({
   db,
   modalVisible,
   setModalVisible,
-  setBooks,
 }) {
   const { addBooks } = useStore();
   const [newBookName, setNewBookName] = useState("");

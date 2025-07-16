@@ -11,7 +11,7 @@ const initializeDatabase = async () => {
   setLoading(true);
   
   try {
-    const db = await SQLite.openDatabaseAsync('cashmate.db');
+    const db = await SQLite.openDatabaseAsync('cashbookbd.db');
     
     // Execute all SQL commands in sequence
     await db.execAsync(`

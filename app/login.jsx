@@ -87,24 +87,27 @@ export default function Login() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.inner}>
-        <Text style={styles.title}>Welcome to CashMate</Text>
+        <Text style={styles.title}>Welcome to CashBook BD</Text>
         <Text style={styles.subtitle}>Enter your 4-digit PIN</Text>
 
         <View style={styles.pinContainer}>
-          {[0, 1, 2, 3].map((index) => (
-            <TextInput
-              key={index}
-              ref={(ref) => (pinInputs.current[index] = ref)}
-              style={styles.pinInput}
-              keyboardType="numeric"
-              maxLength={1}
-              secureTextEntry
-              onChangeText={(text) => handlePinChange(text, index)}
-              onKeyPress={(e) => handleKeyPress(e, index)}
-              value={pin[index] || ""}
-              autoFocus={index === 0}
-            />
-          ))}
+          {[0, 1, 2, 3].map((index) => {
+            const hasValue = !!pin[index];
+            return (
+              <TextInput
+                key={index}
+                ref={(ref) => (pinInputs.current[index] = ref)}
+                style={[styles.pinInput, hasValue && styles.pinInputActive]}
+                keyboardType="numeric"
+                maxLength={1}
+                secureTextEntry
+                onChangeText={(text) => handlePinChange(text, index)}
+                onKeyPress={(e) => handleKeyPress(e, index)}
+                value={pin[index] || ""}
+                autoFocus={index === 0}
+              />
+            );
+          })}
         </View>
 
         <TouchableOpacity
@@ -150,12 +153,15 @@ const styles = StyleSheet.create({
     width: 55,
     height: 55,
     borderWidth: 1,
-    borderColor: "#007AFF",
+    borderColor: '#e0e0e0',
     borderRadius: 10,
     textAlign: "center",
     fontSize: 22,
     color: "#2c3e50",
     backgroundColor: "#f8f9fa",
+  },
+  pinInputActive: {
+    borderColor: "#007AFF",
   },
   forgotButton: {
     marginTop: 20,

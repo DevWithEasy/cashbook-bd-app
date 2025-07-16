@@ -19,21 +19,17 @@ import { getBooks } from "../../utils/bookController";
 import { useStore } from "../../utils/z-store";
 
 export default function Home() {
-  const { books, addBooks } = useStore();
+  const { books, addBooks, setDb, db } = useStore();
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [db, setDb] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  // Initialize database
   useEffect(() => {
     const initDB = async () => {
       try {
-        const database = await SQLite.openDatabaseAsync("cashmate.db");
-        setDb(database);
-
+        const database = await SQLite.openDatabaseAsync("cashbookbd.db");
         await database.execAsync(`
           PRAGMA foreign_keys = ON;
           CREATE TABLE IF NOT EXISTS books (
@@ -41,35 +37,32 @@ export default function Home() {
             name TEXT NOT NULL UNIQUE
           );
         `);
-        await loadBooks(database);
+        setDb(database); 
+        await getBooks(database, addBooks);
+        setFilteredBooks(books);
       } catch (error) {
         Alert.alert("Error", "Failed to initialize database");
-        console.error("Database error:", error);
+        console.error("DB Init Error:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    initDB();
+    if (!db) {
+      initDB(); 
+    } else {
+      getBooks(db, addBooks);
+      setFilteredBooks(books);
+      setIsLoading(false);
+    }
   }, []);
 
-  // Function to load books
-  const loadBooks = async (database) => {
-    try {
-      await getBooks(database, addBooks);
-      await getBooks(database, setFilteredBooks);
-    } catch (error) {
-      Alert.alert("Error", "Failed to load books");
-      console.error("Load books error:", error);
-    }
-  };
-
-  // Handle refresh
+  // Refresh books manually
   const onRefresh = async () => {
     setRefreshing(true);
     try {
       if (db) {
-        await loadBooks(db);
+        await getBooks(db, addBooks);
       }
     } catch (error) {
       console.error("Refresh error:", error);
@@ -78,7 +71,7 @@ export default function Home() {
     }
   };
 
-  // Filter books based on search query
+  // Filter books on search
   useEffect(() => {
     if (searchQuery.trim() === "") {
       setFilteredBooks(books);
@@ -88,7 +81,7 @@ export default function Home() {
       );
       setFilteredBooks(filtered);
     }
-  }, [searchQuery, books]);
+  }, [books, searchQuery]);
 
   if (isLoading) {
     return (
@@ -101,7 +94,7 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      {/* Search Input */}
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
         <TextInput
@@ -138,14 +131,14 @@ export default function Home() {
         <NoBooksFound />
       )}
 
-      {/* Create Book Modal */}
+      {/* Modal */}
       <CreateBookModal
         modalVisible={modalVisible}
         setModalVisible={setModalVisible}
         db={db}
       />
 
-      {/* Floating Action Button */}
+      {/* FAB */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => setModalVisible(true)}

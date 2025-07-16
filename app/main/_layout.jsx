@@ -36,8 +36,8 @@ export default function MainLayout() {
         <Drawer.Screen
           name="categories"
           options={{
-            drawerLabel: "Transaction Categories",
-            title: "Transaction Categories",
+            drawerLabel: "Categories",
+            title: "Categories",
             drawerIcon: ({ color, size }) => (
               <Ionicons name="layers" size={size} color={color} />
             ),

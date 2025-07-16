@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import * as SQLite from "expo-sqlite";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -12,7 +11,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { getBooks } from "../../utils/bookController";
@@ -23,6 +22,14 @@ export default function AddTransaction() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { bookId, transactionType } = params;
+
+  const {
+    db,
+    setDb,
+    addBooks,
+    addTransactions,
+  } = useStore();
+
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [categories, setCategories] = useState([]);
@@ -32,13 +39,18 @@ export default function AddTransaction() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { addBooks, addTransactions } = useStore();
 
   useEffect(() => {
-    const loadCategories = async () => {
+    const initDbAndLoad = async () => {
       try {
-        const database = await SQLite.openDatabaseAsync("cashmate.db");
-        const results = await database.getAllAsync(
+        if (!db) {
+          const SQLite = await import("expo-sqlite");
+          const database = await SQLite.openDatabaseAsync("cashbookbd.db");
+          setDb(database);
+          return; // wait for db to be set, useEffect will re-run
+        }
+
+        const results = await db.getAllAsync(
           "SELECT * FROM categories ORDER BY name ASC"
         );
         setCategories(results);
@@ -46,20 +58,19 @@ export default function AddTransaction() {
           setCategoryId(results[0].id);
         }
       } catch (err) {
-        setError("Failed to load categories");
-        console.error("Category load error:", err);
+        setError("Failed to initialize database or load categories");
+        console.error("Init/load error:", err);
       } finally {
         setLoading(false);
       }
     };
-    loadCategories();
-  }, []);
+
+    initDbAndLoad();
+  }, [db]);
 
   const handleDateChange = (event, selectedDate) => {
     setShowDatePicker(false);
-    if (selectedDate) {
-      setDate(selectedDate);
-    }
+    if (selectedDate) setDate(selectedDate);
   };
 
   const handleTimeChange = (event, selectedTime) => {
@@ -74,19 +85,20 @@ export default function AddTransaction() {
 
   const handleSave = async () => {
     if (!amount || !categoryId) {
-      Toast.show({
-        type: "error",
-        text1: "Please fill all required fields",
-      });
+      Toast.show({ type: "error", text1: "Please fill all required fields" });
+      return;
+    }
+
+    if (!db) {
+      Toast.show({ type: "error", text1: "Database not ready yet" });
       return;
     }
 
     try {
-      const database = await SQLite.openDatabaseAsync("cashmate.db");
-      await database.runAsync(
+      await db.runAsync(
         `INSERT INTO transactions 
-        (book_id, cat_id, amount, remark, cashin, cashout, date, time) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (book_id, cat_id, amount, remark, cashin, cashout, date, time) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           bookId,
           categoryId,
@@ -98,15 +110,15 @@ export default function AddTransaction() {
           date.toTimeString().split(" ")[0],
         ]
       );
-      getTransactions(database, bookId, addTransactions);
+
+      getTransactions(db, bookId, addTransactions);
+      getBooks(db, addBooks);
+
+      Toast.show({ type: "success", text1: "Transaction saved successfully!" });
       router.back();
-      getBooks(database, addBooks);
     } catch (err) {
-      Toast.show({
-        type: "error",
-        text1: "Failed to save transaction",
-      });
-      console.error("Save transaction error:", err);
+      Toast.show({ type: "error", text1: "Failed to save transaction" });
+      console.error("Save error:", err);
     }
   };
 
@@ -138,7 +150,6 @@ export default function AddTransaction() {
           }}
         />
 
-        {/* Amount */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Amount*</Text>
           <TextInput
@@ -150,7 +161,6 @@ export default function AddTransaction() {
           />
         </View>
 
-        {/* Category */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Category*</Text>
           <View style={styles.pickerWrapper}>
@@ -166,7 +176,6 @@ export default function AddTransaction() {
           </View>
         </View>
 
-        {/* Date & Time */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Date & Time*</Text>
           <View style={styles.datetimeRow}>
@@ -195,22 +204,13 @@ export default function AddTransaction() {
           </View>
 
           {showDatePicker && (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              onChange={handleDateChange}
-            />
+            <DateTimePicker value={date} mode="date" onChange={handleDateChange} />
           )}
           {showTimePicker && (
-            <DateTimePicker
-              value={date}
-              mode="time"
-              onChange={handleTimeChange}
-            />
+            <DateTimePicker value={date} mode="time" onChange={handleTimeChange} />
           )}
         </View>
 
-        {/* Remark */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Remark</Text>
           <TextInput
@@ -223,7 +223,6 @@ export default function AddTransaction() {
           />
         </View>
 
-        {/* Save Button */}
         <TouchableOpacity
           style={[
             styles.saveButton,

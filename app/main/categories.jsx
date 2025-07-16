@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as SQLite from "expo-sqlite";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,38 +12,45 @@ import {
 } from "react-native";
 import Toast from "react-native-toast-message";
 import CreateCategoryModal from "../../components/CreateCategoryModal";
+import { useStore } from "../../utils/z-store";
 
 export default function Categories() {
+  const { db, setDb } = useStore();
+
   const [categories, setCategories] = useState([]);
   const [filteredCategories, setFilteredCategories] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [newCategory, setNewCategory] = useState("");
   const [editCategory, setEditCategory] = useState(null);
-  const [db, setDb] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Initialize DB
   useEffect(() => {
     const initDB = async () => {
       try {
-        const database = await SQLite.openDatabaseAsync("cashmate.db");
+        const SQLite = await import("expo-sqlite");
+        const database = await SQLite.openDatabaseAsync("cashbookbd.db");
         setDb(database);
         await loadCategories(database);
       } catch (error) {
         Toast.show({
-        type: "error",
-        text1: "Failed to initialize database",
-      });
+          type: "error",
+          text1: "Failed to initialize database",
+        });
         console.error("Database error:", error);
       } finally {
         setLoading(false);
       }
     };
-    initDB();
-  }, []);
 
-  // Filter categories
+    if (!db) {
+      initDB();
+    } else {
+      loadCategories(db);
+      setLoading(false);
+    }
+  }, [db, setDb]);
+
   useEffect(() => {
     if (searchQuery.trim()) {
       const filtered = categories.filter((cat) =>
@@ -125,11 +131,10 @@ export default function Categories() {
       setEditCategory(null);
       await loadCategories(db);
     } catch (error) {
-      Alert.alert("Error", "Failed to save category");
       Toast.show({
-          type: "error",
-          text1: "Failed to save category",
-        });
+        type: "error",
+        text1: "Failed to save category",
+      });
       console.error("Save error:", error);
     }
   };
@@ -207,7 +212,7 @@ export default function Categories() {
 
   return (
     <View style={styles.container}>
-      {/* Search */}
+      {/* Search Input */}
       <View style={styles.searchBar}>
         <Ionicons name="search" size={20} color="#888" />
         <TextInput
@@ -254,7 +259,7 @@ export default function Categories() {
         )}
       />
 
-      {/* Add Category Button (FAB) */}
+      {/* FAB */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => {
@@ -279,6 +284,7 @@ export default function Categories() {
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

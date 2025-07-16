@@ -11,13 +11,12 @@ import {
   View
 } from "react-native";
 import Toast from "react-native-toast-message";
-import BookUpdateModal from "../../c../../components/BookUpdateModal";
+import BookUpdateModal from "../../components/BookUpdateModal";
 import BookBalanceSummery from "../../components/BookBalanceSummery";
 import BookMenu from "../../components/BookMenu";
 import TransactionButton from "../../components/TransactionButton";
 import TransactionItem from "../../components/TransactionItem";
 import { getBooks } from "../../utils/bookController";
-import { initDb } from "../../utils/initDB";
 import { fetchTransactions } from "../../utils/transactionController";
 import { useStore } from "../../utils/z-store";
 
@@ -25,20 +24,54 @@ export default function BookDetails() {
   const params = useLocalSearchParams();
   const book = params.book ? JSON.parse(params.book) : null;
   const id = params.id;
-  const {books,addBooks,transactions, addTransactions} = useStore();
+
+  const {
+    db,
+    setDb,
+    books,
+    addBooks,
+    transactions,
+    addTransactions,
+  } = useStore();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [db, setDb] = useState(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [newBookName, setNewBookName] = useState(book?.name || "");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Calculate running balance for ALL transactions
+  // DB init if not already
+  useEffect(() => {
+    const openDb = async () => {
+      try {
+        const SQLite = await import("expo-sqlite");
+        const database = await SQLite.openDatabaseAsync("cashbookbd.db");
+        setDb(database);
+      } catch (err) {
+        console.error("Database open failed:", err);
+        setError("Failed to open database.");
+        setLoading(false);
+      }
+    };
+
+    if (!db) {
+      openDb();
+    }
+  }, []);
+
+  // Load transactions and books when db ready
+  useEffect(() => {
+    if (db) {
+      fetchTransactions(db, id, addTransactions, setError, setLoading);
+      getBooks(db, addBooks);
+    }
+  }, [db, id]);
+
   const transactionsWithBalance = useMemo(() => {
     let balance = 0;
     return transactions
-      .slice() // Create a copy to avoid mutating original
+      .slice()
       .reverse()
       .map((transaction) => {
         balance = transaction.cashin
@@ -49,7 +82,6 @@ export default function BookDetails() {
       .reverse();
   }, [transactions]);
 
-  // Filter transactions based on search query
   const displayedTransactions = useMemo(() => {
     if (!searchQuery) return transactionsWithBalance;
 
@@ -61,21 +93,7 @@ export default function BookDetails() {
     );
   }, [searchQuery, transactionsWithBalance]);
 
-  // Initialize database
-  useEffect(() => {
-    initDb(setDb, setError);
-  }, []);
-
-  // Fetch transactions when db is ready
-  useEffect(() => {
-    if (db) {
-      fetchTransactions(db, id, addTransactions, setError, setLoading);
-    }
-  }, [addTransactions, db, id]);
-
-  const handleMenuPress = () => {
-    setMenuVisible(!menuVisible);
-  };
+  const handleMenuPress = () => setMenuVisible(!menuVisible);
 
   const updateBookName = async () => {
     if (!newBookName.trim()) {
@@ -93,7 +111,7 @@ export default function BookDetails() {
       ]);
       setEditModalVisible(false);
       book.name = newBookName;
-      getBooks(db,addBooks)
+      getBooks(db, addBooks);
       Toast.show({
         type: "success",
         text1: "Book name updated successfully",
@@ -107,7 +125,7 @@ export default function BookDetails() {
     }
   };
 
-  if (loading) {
+  if (loading || !db) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" />
@@ -127,7 +145,7 @@ export default function BookDetails() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: books.find((findBook)=> findBook.id === book.id)?.name || "Book Details",
+          title: books.find((b) => b.id === book.id)?.name || "Book Details",
           headerRight: () => (
             <TouchableOpacity onPress={handleMenuPress}>
               <Ionicons name="ellipsis-vertical" size={20} />
@@ -147,7 +165,6 @@ export default function BookDetails() {
         />
       )}
 
-      {/* Edit Book Name Modal */}
       <BookUpdateModal
         editModalVisible={editModalVisible}
         setEditModalVisible={setEditModalVisible}
@@ -156,7 +173,6 @@ export default function BookDetails() {
         updateBookName={updateBookName}
       />
 
-      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#666" />
         <TextInput
@@ -167,16 +183,12 @@ export default function BookDetails() {
         />
       </View>
 
-      {/* Balance Summary - Shows summary for ALL transactions */}
       <BookBalanceSummery transactions={displayedTransactions} />
 
-      {/* Transaction Count - Shows count of FILTERED transactions */}
       <Text style={styles.transactionCount}>
-        Showing {displayedTransactions.length} {searchQuery ? "matching " : ""}
-        entries
+        Showing {displayedTransactions.length} {searchQuery ? "matching " : ""}entries
       </Text>
 
-      {/* Transactions List - Shows FILTERED transactions with PROPER running balance */}
       {displayedTransactions.length > 0 ? (
         <FlatList
           data={displayedTransactions}

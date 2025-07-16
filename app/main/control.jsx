@@ -14,7 +14,7 @@ export default function Control() {
   useEffect(() => {
     const initDB = async () => {
       try {
-        const database = await SQLite.openDatabaseAsync('cashmate.db');
+        const database = await SQLite.openDatabaseAsync('cashbookbd.db');
         setDb(database);
       } catch (error) {
         Alert.alert('Error', 'Database initialization failed');
@@ -89,7 +89,7 @@ export default function Control() {
                 setDb(null);
               }
 
-              const dbPath = `${FileSystem.documentDirectory}SQLite/cashmate.db`;
+              const dbPath = `${FileSystem.documentDirectory}SQLite/cashbookbd.db`;
               const dbInfo = await FileSystem.getInfoAsync(dbPath);
 
               if (dbInfo.exists) {
