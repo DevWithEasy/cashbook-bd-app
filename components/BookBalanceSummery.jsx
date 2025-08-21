@@ -2,75 +2,91 @@ import { View, Text, StyleSheet } from 'react-native'
 import React from 'react'
 import Divider from './Divider';
 
-export default function BookBalanceSummery({transactions}) {
-      // Calculate totals
-  const totalIn = transactions
-    .filter((t) => t.cashin)
+export default function BookBalanceSummary({transactions}) {
+  // Calculate totals using income/expense type
+  const totalIncome = transactions
+    .filter((t) => t.type === 'income')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const totalOut = transactions
-    .filter((t) => t.cashout)
+  const totalExpense = transactions
+    .filter((t) => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const currentBalance = totalIn - totalOut;
+  const currentBalance = totalIncome - totalExpense;
+
   return (
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Net Balance</Text>
-              <Text style={styles.summaryValue}>
-                {currentBalance.toLocaleString()}
-              </Text>
-            </View>
-            <Divider/>
-            <View style={[styles.summaryRow,styles.marginBottom]}>
-              <Text style={styles.summaryLabel}>Total In (+)</Text>
-              <Text style={[styles.summaryValue, styles.incomeText]}>
-                {totalIn.toLocaleString()}
-              </Text>
-            </View>
-            <View style={[styles.summaryRow,styles.marginBottom]}>
-              <Text style={styles.summaryLabel}>Total Out (-)</Text>
-              <Text style={[styles.summaryValue, styles.expenseText]}>
-                {totalOut.toLocaleString()}
-              </Text>
-            </View>
-          </View>
+    <View style={styles.summaryContainer}>
+      {/* Net Balance */}
+      <View style={styles.summaryRow}>
+        <Text style={styles.summaryLabel}>নিট ব্যালেন্স</Text>
+        <Text style={[
+          styles.summaryValue, 
+          currentBalance >= 0 ? styles.positiveBalance : styles.negativeBalance
+        ]}>
+          {currentBalance.toLocaleString('bn-BD')}
+        </Text>
+      </View>
+      
+      <Divider/>
+      
+      {/* Income */}
+      <View style={[styles.summaryRow, styles.marginBottom]}>
+        <Text style={styles.summaryLabel}>মোট আয় (+)</Text>
+        <Text style={[styles.summaryValue, styles.incomeText]}>
+          {totalIncome.toLocaleString('bn-BD')}
+        </Text>
+      </View>
+      
+      {/* Expense */}
+      <View style={[styles.summaryRow, styles.marginBottom]}>
+        <Text style={styles.summaryLabel}>মোট খরচ (-)</Text>
+        <Text style={[styles.summaryValue, styles.expenseText]}>
+          {totalExpense.toLocaleString('bn-BD')}
+        </Text>
+      </View>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
   summaryContainer: {
     backgroundColor: "#fff",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingTop : 8,
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: 'center',
+    paddingVertical: 6,
   },
   marginBottom: {
     marginBottom: 8,
   },
   summaryLabel: {
-    color: "#333",
-    fontSize : 16,
+    color: "#4b5563",
+    fontFamily : 'bangla_semibold'
   },
   summaryValue: {
-    fontWeight: "bold",
+    fontFamily : 'bangla_semibold',
+    fontSize: 16,
   },
-    incomeText: {
-    color: "#4CAF50",
-    fontSize : 16,
+  incomeText: {
+    color: "#22c55e",
   },
   expenseText: {
-    color: "#F44336",
-    fontSize : 16,
+    color: "#ef4444",
+  },
+  positiveBalance: {
+    color: "#22c55e",
+  },
+  negativeBalance: {
+    color: "#ef4444",
   },
 });

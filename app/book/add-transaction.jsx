@@ -14,21 +14,20 @@ import {
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
-import { getBooks } from "../../utils/bookController";
-import { getTransactions } from "../../utils/transactionController";
+import * as FileSystem from "expo-file-system";
+import * as Crypto from "expo-crypto";
 import { useStore } from "../../utils/z-store";
+
+const TRANSACTIONS_FILE = (bookId) =>
+  FileSystem.documentDirectory + `book_${bookId}.json`;
+const CATEGORIES_FILE = FileSystem.documentDirectory + "categories.json";
 
 export default function AddTransaction() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { bookId, transactionType } = params;
 
-  const {
-    db,
-    setDb,
-    addBooks,
-    addTransactions,
-  } = useStore();
+  const { addTransactions } = useStore();
 
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -41,32 +40,27 @@ export default function AddTransaction() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const initDbAndLoad = async () => {
+    const loadCategories = async () => {
       try {
-        if (!db) {
-          const SQLite = await import("expo-sqlite");
-          const database = await SQLite.openDatabaseAsync("cashbookbd.db");
-          setDb(database);
-          return; // wait for db to be set, useEffect will re-run
-        }
-
-        const results = await db.getAllAsync(
-          "SELECT * FROM categories ORDER BY name ASC"
-        );
-        setCategories(results);
-        if (results.length > 0) {
-          setCategoryId(results[0].id);
+        const fileInfo = await FileSystem.getInfoAsync(CATEGORIES_FILE);
+        if (fileInfo.exists) {
+          const content = await FileSystem.readAsStringAsync(CATEGORIES_FILE);
+          const loadedCategories = JSON.parse(content);
+          setCategories(loadedCategories);
+          if (loadedCategories.length > 0) {
+            setCategoryId(loadedCategories[0].id);
+          }
         }
       } catch (err) {
-        setError("Failed to initialize database or load categories");
-        console.error("Init/load error:", err);
+        setError("ক্যাটাগরি লোড করতে ব্যর্থ হয়েছে");
+        console.error("Category load error:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    initDbAndLoad();
-  }, [db]);
+    loadCategories();
+  }, []);
 
   const handleDateChange = (event, selectedDate) => {
     setShowDatePicker(false);
@@ -85,39 +79,62 @@ export default function AddTransaction() {
 
   const handleSave = async () => {
     if (!amount || !categoryId) {
-      Toast.show({ type: "error", text1: "Please fill all required fields" });
-      return;
-    }
-
-    if (!db) {
-      Toast.show({ type: "error", text1: "Database not ready yet" });
+      Toast.show({
+        type: "error",
+        text1: "সমস্ত প্রয়োজনীয় তথ্য প্রদান করুন",
+        text2: "পরিমাণ এবং বিভাগ পূরণ করা আবশ্যক",
+      });
       return;
     }
 
     try {
-      await db.runAsync(
-        `INSERT INTO transactions 
-         (book_id, cat_id, amount, remark, cashin, cashout, date, time) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          bookId,
-          categoryId,
-          parseFloat(amount),
-          remark,
-          transactionType === "cashin" ? 1 : 0,
-          transactionType === "cashout" ? 1 : 0,
-          date.toISOString().split("T")[0],
-          date.toTimeString().split(" ")[0],
-        ]
+      const amountValue = parseFloat(amount);
+      if (isNaN(amountValue)) {
+        Toast.show({ type: "error", text1: "অবৈধ পরিমাণ" });
+        return;
+      }
+
+      const filePath = TRANSACTIONS_FILE(bookId);
+      const fileInfo = await FileSystem.getInfoAsync(filePath);
+      const existingTransactions = fileInfo.exists
+        ? JSON.parse(await FileSystem.readAsStringAsync(filePath))
+        : [];
+
+      const newTransaction = {
+        id: Crypto.randomUUID(),
+        book_id: bookId,
+        category_id: categoryId,
+        category: categories.find((c) => c.id === categoryId)?.name || "",
+        amount: amountValue,
+        remark: remark,
+        type: transactionType,
+        date: date.toISOString().split("T")[0],
+        time: date.toTimeString().split(" ")[0],
+        created_at: new Date().toISOString(),
+      };
+
+      const updatedTransactions = [...existingTransactions, newTransaction];
+      await FileSystem.writeAsStringAsync(
+        filePath,
+        JSON.stringify(updatedTransactions)
       );
 
-      getTransactions(db, bookId, addTransactions);
-      getBooks(db, addBooks);
+      addTransactions(updatedTransactions);
 
-      Toast.show({ type: "success", text1: "Transaction saved successfully!" });
+      Toast.show({
+        type: "success",
+        text1: "লেনদেন সফলভাবে সংরক্ষিত হয়েছে!",
+        text2: `${amountValue.toLocaleString()} টাকা ${
+          transactionType === "cashin" ? "আয়" : "খরচ"
+        } হিসাবে যোগ করা হয়েছে`,
+      });
       router.back();
     } catch (err) {
-      Toast.show({ type: "error", text1: "Failed to save transaction" });
+      Toast.show({
+        type: "error",
+        text1: "লেনদেন সংরক্ষণ করতে ব্যর্থ হয়েছে",
+        text2: "দয়া করে আবার চেষ্টা করুন",
+      });
       console.error("Save error:", err);
     }
   };
@@ -125,7 +142,8 @@ export default function AddTransaction() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text style={styles.loadingText}>লোড হচ্ছে...</Text>
       </View>
     );
   }
@@ -134,6 +152,12 @@ export default function AddTransaction() {
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => setLoading(true)}
+        >
+          <Text style={styles.retryButtonText}>আবার চেষ্টা করুন</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -146,15 +170,18 @@ export default function AddTransaction() {
       <View style={styles.container}>
         <Stack.Screen
           options={{
-            title: transactionType === "cashin" ? "Add Income" : "Add Expense",
+            title:
+              transactionType === "income"
+                ? "নতুন আয় যোগ করুন"
+                : "নতুন খরচ যোগ করুন",
           }}
         />
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Amount*</Text>
+          <Text style={styles.label}>পরিমাণ*</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter amount"
+            placeholder="টাকার পরিমাণ লিখুন"
             keyboardType="numeric"
             value={amount}
             onChangeText={setAmount}
@@ -162,12 +189,12 @@ export default function AddTransaction() {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Category*</Text>
+          <Text style={styles.label}>বিভাগ*</Text>
           <View style={styles.pickerWrapper}>
             <Picker
               selectedValue={categoryId}
               onValueChange={setCategoryId}
-              dropdownIconColor="#007AFF"
+              dropdownIconColor="#3b82f6"
             >
               {categories.map((cat) => (
                 <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
@@ -177,15 +204,15 @@ export default function AddTransaction() {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Date & Time*</Text>
+          <Text style={styles.label}>তারিখ ও সময়*</Text>
           <View style={styles.datetimeRow}>
             <TouchableOpacity
               style={styles.datetimeButton}
               onPress={() => setShowDatePicker(true)}
             >
-              <Ionicons name="calendar" size={18} color="#007AFF" />
+              <Ionicons name="calendar" size={18} color="#3b82f6" />
               <Text style={styles.datetimeText}>
-                {date.toLocaleDateString()}
+                {date.toLocaleDateString("bn-BD")}
               </Text>
             </TouchableOpacity>
 
@@ -193,9 +220,9 @@ export default function AddTransaction() {
               style={styles.datetimeButton}
               onPress={() => setShowTimePicker(true)}
             >
-              <Ionicons name="time" size={18} color="#007AFF" />
+              <Ionicons name="time" size={18} color="#3b82f6" />
               <Text style={styles.datetimeText}>
-                {date.toLocaleTimeString([], {
+                {date.toLocaleTimeString("bn-BD", {
                   hour: "2-digit",
                   minute: "2-digit",
                 })}
@@ -204,22 +231,31 @@ export default function AddTransaction() {
           </View>
 
           {showDatePicker && (
-            <DateTimePicker value={date} mode="date" onChange={handleDateChange} />
+            <DateTimePicker
+              value={date}
+              mode="date"
+              onChange={handleDateChange}
+            />
           )}
           {showTimePicker && (
-            <DateTimePicker value={date} mode="time" onChange={handleTimeChange} />
+            <DateTimePicker
+              value={date}
+              mode="time"
+              onChange={handleTimeChange}
+            />
           )}
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Remark</Text>
+          <Text style={styles.label}>মন্তব্য</Text>
           <TextInput
             style={[styles.input, styles.remarkInput]}
-            placeholder="Optional note"
+            placeholder="অতিরিক্ত তথ্য (ঐচ্ছিক)"
             multiline
             numberOfLines={3}
             value={remark}
             onChangeText={setRemark}
+            textAlignVertical="top"
           />
         </View>
 
@@ -231,7 +267,7 @@ export default function AddTransaction() {
           onPress={handleSave}
           disabled={!amount || !categoryId}
         >
-          <Text style={styles.saveButtonText}>Save Transaction</Text>
+          <Text style={styles.saveButtonText}>লেনদেন সংরক্ষণ করুন</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -248,17 +284,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    fontSize: 15,
     color: "#374151",
     marginBottom: 6,
+    fontFamily : 'bangla_bold',
   },
   input: {
     backgroundColor: "#fff",
     padding: 14,
     borderRadius: 10,
-    fontSize: 16,
     borderColor: "#e5e7eb",
     borderWidth: 1,
+    fontFamily : 'bangla_regular',
   },
   pickerWrapper: {
     borderWidth: 1,
@@ -285,18 +321,20 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   datetimeText: {
-    fontSize: 16,
     color: "#111827",
+    fontFamily : 'bangla_regular',
   },
   remarkInput: {
     minHeight: 80,
     textAlignVertical: "top",
+    fontFamily : 'bangla_regular',
   },
   saveButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#3b82f6",
     padding: 16,
     borderRadius: 10,
     alignItems: "center",
+    marginTop: 10,
   },
   disabledButton: {
     backgroundColor: "#9ca3af",
@@ -304,11 +342,31 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "600",
+    fontFamily : 'bangla_semibold',
   },
   errorText: {
     textAlign: "center",
-    color: "#f43f5e",
+    color: "#ef4444",
     fontSize: 16,
+    marginBottom: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    textAlign: "center",
+    color: "#64748b",
+    fontFamily : 'bangla_semibold',
+  },
+  retryButton: {
+    backgroundColor: "#3b82f6",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 20,
+    alignSelf: "center",
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily : 'bangla_semibold',
   },
 });

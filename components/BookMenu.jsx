@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from 'expo-file-system';
 import * as Print from "expo-print";
 import { useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
@@ -11,12 +12,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Toast from "react-native-toast-message";
-import { getBooks } from "../utils/bookController";
 import { useStore } from "../utils/z-store";
 
+const BOOKS_FILE = FileSystem.documentDirectory + 'books.json';
+const TRANSACTIONS_FILE = (bookId) => FileSystem.documentDirectory + `book_${bookId}.json`;
+
 export default function BookMenu({
-  db,
   id,
   book,
   transactions,
@@ -24,7 +25,7 @@ export default function BookMenu({
   setEditModalVisible,
 }) {
   const router = useRouter();
-  const { addBooks } = useStore();
+  const { books, addBooks, addTransactions } = useStore();
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleEditBook = () => {
@@ -35,12 +36,12 @@ export default function BookMenu({
   const handleDeleteBook = () => {
     setMenuVisible(false);
     Alert.alert(
-      "Delete Book",
-      "This will delete the book and all its transactions. Are you sure?",
+      "বই ডিলিট করুন",
+      "এটি বই এবং এর সমস্ত লেনদেন মুছে ফেলবে। আপনি কি নিশ্চিত?",
       [
-        { text: "Cancel", style: "cancel" },
+        { text: "বাতিল", style: "cancel" },
         {
-          text: "Delete",
+          text: "ডিলিট করুন",
           style: "destructive",
           onPress: () => deleteBookAndTransactions(),
         },
@@ -50,22 +51,22 @@ export default function BookMenu({
 
   const deleteBookAndTransactions = async () => {
     try {
-      await db.execAsync("BEGIN TRANSACTION");
-      await db.runAsync("DELETE FROM transactions WHERE book_id = ?", [id]);
-      await db.runAsync("DELETE FROM books WHERE id = ?", [id]);
-      await db.execAsync("COMMIT");
-      Toast.show({
-        type: "success",
-        text1: "Book and all its transactions deleted successfully!",
-      });
-      getBooks(db, addBooks);
+      // Delete transactions file
+      const transactionsPath = TRANSACTIONS_FILE(id);
+      await FileSystem.deleteAsync(transactionsPath);
+      
+      // Update books list
+      const booksContent = await FileSystem.readAsStringAsync(BOOKS_FILE);
+      const allBooks = JSON.parse(booksContent);
+      const updatedBooks = allBooks.filter(b => b.id !== id);
+      
+      await FileSystem.writeAsStringAsync(BOOKS_FILE, JSON.stringify(updatedBooks));
+      
+      // Update store
+      addBooks(updatedBooks);
+      addTransactions([]);
       router.back();
     } catch (err) {
-      await db.execAsync("ROLLBACK");
-      Toast.show({
-        type: "error",
-        text1: "Failed to delete book and transactions",
-      });
       console.error(err);
     }
   };
@@ -93,52 +94,45 @@ export default function BookMenu({
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
-          dialogTitle: `${book.name} Transaction History`,
+          dialogTitle: `${book.name} লেনদেনের ইতিহাস`,
           mimeType: "application/pdf",
         });
       } else {
         Alert.alert(
-          "Sharing unavailable",
-          "Your device does not support sharing"
+          "শেয়ারিং অসমর্থিত",
+          "আপনার ডিভাইসে শেয়ারিং সাপোর্ট করে না"
         );
       }
     } catch (error) {
-      console.error("PDF generation failed:", error);
-      Toast.show({
-        type: "error",
-        text1: "Failed to generate PDF",
-      });
+      console.error("PDF জেনারেট করতে ব্যর্থ:", error);
     } finally {
       setIsGenerating(false);
     }
   };
 
   const generatePdfHtml = (book, transactions) => {
-    const totalCashIn = transactions.reduce(
-      (sum, t) => (t.cashin ? sum + t.amount : sum),
+    const totalIncome = transactions.reduce(
+      (sum, t) => (t.type === 'income' ? sum + t.amount : sum),
       0
     );
-    const totalCashOut = transactions.reduce(
-      (sum, t) => (t.cashout ? sum + t.amount : sum),
+    const totalExpense = transactions.reduce(
+      (sum, t) => (t.type === 'expense' ? sum + t.amount : sum),
       0
     );
-    const balance = totalCashIn - totalCashOut;
+    const balance = totalIncome - totalExpense;
 
     const transactionRows = transactions
       .map(
         (t) => `
       <tr>
-        <td>${t.date} ${t.time}</td>
-        <td>${t.category_name}</td>
+        <td>${new Date(t.date).toLocaleDateString()}</td>
+        <td>${t.category || "-"}</td>
         <td>${t.remark || "-"}</td>
-        <td style="text-align: right;" class="positive">${
-          t.cashin ? t.amount.toLocaleString() : "-"
-        }</td>
-        <td style="text-align: right;" class="negative">${
-          t.cashout ? t.amount.toLocaleString() : "-"
-        }</td>
+        <td style="text-align: right;" class="${t.type === 'income' ? 'positive' : 'negative'}">
+          ${t.amount.toLocaleString()}
+        </td>
         <td style="text-align: right;">
-          ${t.runningBalance.toLocaleString()}
+          ${t.runningBalance?.toLocaleString() || "0"}
         </td>
       </tr>
     `
@@ -150,7 +144,7 @@ export default function BookMenu({
       <html>
       <head>
         <meta charset="utf-8">
-        <title>${book.name} Transactions</title>
+        <title>${book.name} লেনদেন</title>
         <style>
           body { font-family: Arial; font-size: 12px; padding: 20px 30px; }
           .header { text-align: center; margin-bottom: 20px; }
@@ -172,24 +166,24 @@ export default function BookMenu({
       </head>
       <body>
         <div class="header">
-          <div class="app-name">CashBook BD</div>
-          <div class="app-slogan">Your Personal Financial Manager</div>
+          <div class="app-name">ক্যাশবুক BD</div>
+          <div class="app-slogan">আপনার ব্যক্তিগত আর্থিক ব্যবস্থাপক</div>
         </div>
         
-        <div class="report-title">${book.name} Transaction Report</div>
-        <div class="generated-date">Generated on: ${new Date().toLocaleString()}</div>
+        <div class="report-title">${book.name} লেনদেন রিপোর্ট</div>
+        <div class="generated-date">তৈরির তারিখ: ${new Date().toLocaleString()}</div>
         
         <div class="summary-container">
           <div class="summary-box">
-            <div class="summary-title">Total Cash In</div>
-            <div class="summary-value positive">${totalCashIn.toLocaleString()}</div>
+            <div class="summary-title">মোট আয়</div>
+            <div class="summary-value positive">${totalIncome.toLocaleString()}</div>
           </div>
           <div class="summary-box">
-            <div class="summary-title">Total Cash Out</div>
-            <div class="summary-value negative">${totalCashOut.toLocaleString()}</div>
+            <div class="summary-title">মোট খরচ</div>
+            <div class="summary-value negative">${totalExpense.toLocaleString()}</div>
           </div>
           <div class="summary-box">
-            <div class="summary-title">Current Balance</div>
+            <div class="summary-title">বর্তমান ব্যালেন্স</div>
             <div class="summary-value">${balance.toLocaleString()}</div>
           </div>
         </div>
@@ -197,12 +191,11 @@ export default function BookMenu({
         <table>
           <thead>
             <tr>
-              <th>Date & Time</th>
-              <th>Category</th>
-              <th>Remarks</th>
-              <th>Cash In</th>
-              <th>Cash Out</th>
-              <th>Balance</th>
+              <th>তারিখ</th>
+              <th>বিভাগ</th>
+              <th>মন্তব্য</th>
+              <th>পরিমাণ</th>
+              <th>ব্যালেন্স</th>
             </tr>
           </thead>
           <tbody>
@@ -211,7 +204,7 @@ export default function BookMenu({
         </table>
         
         <div class="footer">
-          <p>Generated by CashBook BD App</p>
+          <p>ক্যাশবুক BD অ্যাপ দ্বারা তৈরি</p>
         </div>
       </body>
       </html>
@@ -223,14 +216,14 @@ export default function BookMenu({
       {isGenerating && (
         <View style={styles.loaderOverlay}>
           <ActivityIndicator size="large" color="#007aff" />
-          <Text style={{ marginTop: 8, color: "#333" }}>Generating PDF...</Text>
+          <Text style={{ marginTop: 8, color: "#333" }}>PDF তৈরি হচ্ছে...</Text>
         </View>
       )}
 
       <TouchableOpacity style={styles.menuItem} onPress={handleEditBook}>
         <View style={styles.menuItemContent}>
           <Ionicons name="create-outline" size={16} style={styles.menuIcon} />
-          <Text>Edit Book</Text>
+          <Text>বই সম্পাদনা</Text>
         </View>
       </TouchableOpacity>
 
@@ -245,7 +238,7 @@ export default function BookMenu({
             size={16}
             style={styles.menuIcon}
           />
-          <Text>Generate PDF</Text>
+          <Text>PDF তৈরি করুন</Text>
         </View>
       </TouchableOpacity>
 
@@ -256,7 +249,7 @@ export default function BookMenu({
             size={16}
             style={[styles.menuIcon, styles.deleteIcon]}
           />
-          <Text style={styles.deleteText}>Delete Book</Text>
+          <Text style={styles.deleteText}>বই ডিলিট করুন</Text>
         </View>
       </TouchableOpacity>
     </View>

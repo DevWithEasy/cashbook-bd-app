@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as SQLite from "expo-sqlite";
-import { useEffect, useState } from "react";
+import * as FileSystem from 'expo-file-system';
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,60 +15,72 @@ import {
 import BookItem from "../../components/BookItem";
 import CreateBookModal from "../../components/CreateBookModal";
 import NoBooksFound from "../../components/NoBooksFound";
-import { getBooks } from "../../utils/bookController";
 import { useStore } from "../../utils/z-store";
+import { useFocusEffect } from '@react-navigation/native';
+
+const BUSINESS_FILE = FileSystem.documentDirectory + 'business.json';
+const BOOK_FILE = FileSystem.documentDirectory + 'books.json';
+const APP_SETTINGS_FILE = FileSystem.documentDirectory + 'settings.json';
 
 export default function Home() {
-  const { books, addBooks, setDb, db } = useStore();
+  const { books, addBooks } = useStore();
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedBusinessId, setSelectedBusinessId] = useState(null);
 
-  useEffect(() => {
-    const initDB = async () => {
-      try {
-        const database = await SQLite.openDatabaseAsync("cashbookbd.db");
-        await database.execAsync(`
-          PRAGMA foreign_keys = ON;
-          CREATE TABLE IF NOT EXISTS books (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE
-          );
-        `);
-        setDb(database); 
-        await getBooks(database, addBooks);
-        setFilteredBooks(books);
-      } catch (error) {
-        Alert.alert("Error", "Failed to initialize database");
-        console.error("DB Init Error:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Load data when screen focuses or business changes
+  useFocusEffect(
+    useCallback(() => {
+      loadInitialData();
+    }, [])
+  );
 
-    if (!db) {
-      initDB(); 
-    } else {
-      getBooks(db, addBooks);
-      setFilteredBooks(books);
+  const loadInitialData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // লোড সিলেক্টেড বিজনেস আইডি
+      const settings = await FileSystem.readAsStringAsync(APP_SETTINGS_FILE);
+      const { selected_business } = JSON.parse(settings);
+      setSelectedBusinessId(selected_business);
+
+      // লোড বই সমূহ
+      const booksData = await FileSystem.readAsStringAsync(BOOK_FILE);
+      const allBooks = JSON.parse(booksData);
+      
+      // শুধুমাত্র সিলেক্টেড বিজনেসের বইগুলো ফিল্টার করুন
+      const businessBooks = allBooks.filter(book => book.business_id === selected_business);
+      addBooks(businessBooks);
+      setFilteredBooks(businessBooks);
+      
+    } catch (error) {
+      Alert.alert("ত্রুটি", "ডাটাবেস লোড করতে ব্যর্থ হয়েছে");
+      console.error("ডাটাবেস লোড ত্রুটি:", error);
+    } finally {
       setIsLoading(false);
     }
-  }, []);
+  };
 
   // Refresh books manually
+  const refreshBooks = async () => {
+    try {
+      const booksData = await FileSystem.readAsStringAsync(BOOK_FILE);
+      const allBooks = JSON.parse(booksData);
+      const businessBooks = allBooks.filter(book => book.business_id === selectedBusinessId);
+      addBooks(businessBooks);
+      setFilteredBooks(businessBooks);
+    } catch (error) {
+      console.error("রিফ্রেশ ত্রুটি:", error);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    try {
-      if (db) {
-        await getBooks(db, addBooks);
-      }
-    } catch (error) {
-      console.error("Refresh error:", error);
-    } finally {
-      setRefreshing(false);
-    }
+    await refreshBooks();
+    setRefreshing(false);
   };
 
   // Filter books on search
@@ -87,7 +99,7 @@ export default function Home() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading books...</Text>
+        <Text style={styles.loadingText}>বইগুলো লোড হচ্ছে...</Text>
       </View>
     );
   }
@@ -99,23 +111,18 @@ export default function Home() {
         <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search books..."
+          placeholder="বই খুঁজুন..."
           value={searchQuery}
           onChangeText={setSearchQuery}
           clearButtonMode="while-editing"
         />
       </View>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>My Books</Text>
-      </View>
-
       {/* Book List */}
       {filteredBooks.length > 0 ? (
         <FlatList
           data={filteredBooks}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.id}
           renderItem={({ item }) => <BookItem book={item} />}
           contentContainerStyle={styles.listContainer}
           refreshControl={
@@ -135,7 +142,8 @@ export default function Home() {
       <CreateBookModal
         modalVisible={modalVisible}
         setModalVisible={setModalVisible}
-        db={db}
+        selectedBusinessId={selectedBusinessId}
+        onBookCreated={refreshBooks} // Refresh when new book is created
       />
 
       {/* FAB */}
@@ -155,15 +163,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
-  header: {
-    padding: 16,
-    paddingBottom: 4,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-  },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -173,6 +172,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     marginHorizontal: 16,
     marginTop: 16,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: "#ddd",
   },
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontFamily: 'bangla_regular'
   },
   loadingContainer: {
     flex: 1,

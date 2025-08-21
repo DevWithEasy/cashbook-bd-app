@@ -1,9 +1,47 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import * as FileSystem from 'expo-file-system';
+import { useState, useEffect } from "react";
+
+const TRANSACTIONS_FILE = (bookId) => FileSystem.documentDirectory + `book_${bookId}.json`;
 
 export default function BookItem({ book }) {
   const router = useRouter();
+  const [balance, setBalance] = useState(0);
+
+  // Calculate balance from transactions
+  useEffect(() => {
+    const calculateBalance = async () => {
+      try {
+        const filePath = TRANSACTIONS_FILE(book.id);
+        const fileInfo = await FileSystem.getInfoAsync(filePath);
+        
+        if (fileInfo.exists) {
+          const content = await FileSystem.readAsStringAsync(filePath);
+          const transactions = JSON.parse(content);
+          
+          const totalIncome = transactions
+            .filter(t => t.type === 'income')
+            .reduce((sum, t) => sum + t.amount, 0);
+            
+          const totalExpense = transactions
+            .filter(t => t.type === 'expense')
+            .reduce((sum, t) => sum + t.amount, 0);
+            
+          const currentBalance = totalIncome - totalExpense;
+          setBalance(currentBalance);
+        } else {
+          setBalance(0);
+        }
+      } catch (error) {
+        console.error("Balance calculation error:", error);
+        setBalance(0);
+      }
+    };
+
+    calculateBalance();
+  }, [book.id]);
 
   return (
     <TouchableOpacity
@@ -16,22 +54,17 @@ export default function BookItem({ book }) {
       }
     >
       {/* Left Side: Icon */}
-      <View
-      style={styles.bookIcon}
-      >
-        <Ionicons
-        name="reader"
-        size={20}
-        color="#3b82f6"
-      />
+      <View style={styles.bookIcon}>
+        <Ionicons name="reader" size={20} color="#3b82f6" />
       </View>
+      
       {/* Middle: Name + Date */}
       <View style={styles.infoContainer}>
         <Text numberOfLines={1} style={styles.bookName}>
           {book?.name}
         </Text>
         <Text style={styles.updatedText}>
-          Updated on: {book?.last_updated?.split(" ")[0] || "N/A"}
+          সর্বশেষ আপডেট: {book?.updated_at?.split("T")[0].toLocaleString('bn-BD') || "N/A"}
         </Text>
       </View>
 
@@ -40,10 +73,10 @@ export default function BookItem({ book }) {
         <Text
           style={[
             styles.balanceText,
-            { color: book?.balance >= 0 ? "#22c55e" : "#ef4444" },
+            { color: balance >= 0 ? "#22c55e" : "#ef4444" },
           ]}
         >
-          {book?.balance?.toLocaleString() || "0"}
+          {balance.toLocaleString('bn-BD')} টাকা
         </Text>
         <Ionicons name="chevron-forward" size={18} color="#888" />
       </View>
@@ -65,33 +98,32 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 0.7,
   },
-  bookIcon : {
-    backgroundColor : '#c9dbfdff',
-    borderRadius : 50,
-    height : 36,
-    width : 36,
-    justifyContent : 'center',
-    alignItems : 'center',
-    marginRight : 6
+  bookIcon: {
+    backgroundColor: '#c9dbfdff',
+    borderRadius: 50,
+    height: 36,
+    width: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10
   },
   infoContainer: {
     flex: 1,
     justifyContent: "center",
   },
   bookName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1e293b",
+    fontSize: 15,
+    fontFamily: "bangla_semibold",
+    color: "#007AFF",
   },
   updatedText: {
     fontSize: 12,
     color: "#64748b",
-    fontStyle : 'italic',
-    marginTop: 2,
+    fontFamily: "bangla_regular",
   },
   rightContent: {
-    flexDirection : 'row',
-    alignItems: "flex-end",
+    flexDirection: 'row',
+    alignItems: "center",
     justifyContent: "center",
     gap: 4,
   },
@@ -99,5 +131,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     minWidth: 80,
     textAlign: "right",
+    fontFamily: "bangla_bold",
+    fontSize: 14,
   },
 });

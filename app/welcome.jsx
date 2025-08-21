@@ -1,154 +1,139 @@
-import { router } from 'expo-router';
-import * as SQLite from 'expo-sqlite';
-import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Toast from 'react-native-toast-message';
+import * as Crypto from "expo-crypto";
+import * as FileSystem from "expo-file-system";
+import { router } from "expo-router";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import Toast from "react-native-toast-message";
+
+const BUSINESS_FILE = FileSystem.documentDirectory + "business.json";
+const BOOK_FILE = FileSystem.documentDirectory + "books.json";
+const CATEGORIES_FILE = FileSystem.documentDirectory + "categories.json";
+const APP_SETTINGS_FILE = FileSystem.documentDirectory + "settings.json";
 
 export default function WellCome() {
   const [loading, setLoading] = useState(false);
 
-const initializeDatabase = async () => {
-  setLoading(true);
-  
-  try {
-    const db = await SQLite.openDatabaseAsync('cashbookbd.db');
-    
-    // Execute all SQL commands in sequence
-    await db.execAsync(`
-      PRAGMA journal_mode = WAL;
-      
-      CREATE TABLE IF NOT EXISTS books (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        last_updated TEXT DEFAULT CURRENT_TIMESTAMP
-      );
-      
-      CREATE TABLE IF NOT EXISTS categories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        is_default BOOLEAN DEFAULT FALSE
-      );
-      
-      CREATE TABLE IF NOT EXISTS transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        date TEXT NOT NULL,
-        time TEXT NOT NULL,
-        book_id INTEGER NOT NULL,
-        cat_id INTEGER NOT NULL,
-        amount REAL NOT NULL,
-        remark TEXT,
-        cashin BOOLEAN NOT NULL,
-        cashout BOOLEAN NOT NULL,
-        FOREIGN KEY (book_id) REFERENCES books (id),
-        FOREIGN KEY (cat_id) REFERENCES categories (id)
-      );
-      
-      -- Create trigger to update book's last_updated when book name is changed
-      CREATE TRIGGER IF NOT EXISTS update_book_on_name_change
-      AFTER UPDATE OF name ON books
-      BEGIN
-        UPDATE books SET last_updated = CURRENT_TIMESTAMP 
-        WHERE id = NEW.id;
-      END;
-      
-      -- Create trigger to update book's last_updated when transaction is added
-      CREATE TRIGGER IF NOT EXISTS update_book_on_transaction_insert
-      AFTER INSERT ON transactions
-      BEGIN
-        UPDATE books SET last_updated = CURRENT_TIMESTAMP 
-        WHERE id = NEW.book_id;
-      END;
-      
-      -- Create trigger to update book's last_updated when transaction is updated
-      CREATE TRIGGER IF NOT EXISTS update_book_on_transaction_update
-      AFTER UPDATE ON transactions
-      BEGIN
-        UPDATE books SET last_updated = CURRENT_TIMESTAMP 
-        WHERE id = NEW.book_id;
-      END;
-      
-      -- Create trigger to update book's last_updated when transaction is deleted
-      CREATE TRIGGER IF NOT EXISTS update_book_on_transaction_delete
-      AFTER DELETE ON transactions
-      BEGIN
-        UPDATE books SET last_updated = CURRENT_TIMESTAMP 
-        WHERE id = OLD.book_id;
-      END;
-      
-      INSERT INTO books (name) SELECT 'Default Book' 
-      WHERE NOT EXISTS (SELECT 1 FROM books);
-      
-      -- Insert default categories with is_default = TRUE
-      INSERT INTO categories (name, is_default) SELECT 'Food', TRUE 
-      WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Food');
-      
-      INSERT INTO categories (name, is_default) SELECT 'Transport', TRUE 
-      WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Transport');
-      
-      INSERT INTO categories (name, is_default) SELECT 'Salary', TRUE 
-      WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Salary');
-      
-      INSERT INTO categories (name, is_default) SELECT 'Shopping', TRUE 
-      WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Shopping');
-      
-      INSERT INTO categories (name, is_default) SELECT 'Others', TRUE 
-      WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Others');
-    `);
+  const initializeDatabase = async () => {
+    setLoading(true);
 
-    Toast.show({
-        type: "success",
-        text1: "Database initialized successfully",
-      });
-    router.replace('/main');
-  } catch (error) {
-    console.error('Database initialization error:', error);
-    Toast.show({
+    try {
+      const businesses = [
+        {
+          id: Crypto.randomUUID(),
+          name: "আমার ব্যবসা",
+          category: "অন্যান্য",
+          type: "অন্যান্য",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ];
+
+      const books = [
+        {
+          id: Crypto.randomUUID(),
+          business_id: businesses[0].id,
+          name: "ডিফল্ট বই",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ];
+      
+      const categories = [
+        { id: Crypto.randomUUID(), name: "বেতন", type: "income", is_default: true },
+        { id: Crypto.randomUUID(), name: "বিক্রয়", type: "income", is_default: true },
+        { id: Crypto.randomUUID(), name: "অন্যান্য আয়", type: "income", is_default: true },
+        { id: Crypto.randomUUID(), name: "কাঁচামাল", type: "expense", is_default: true },
+        { id: Crypto.randomUUID(), name: "বিদ্যুৎ বিল", type: "expense", is_default: true },
+        { id: Crypto.randomUUID(), name: "অন্যান্য খরচ", type: "expense", is_default: true },
+        { id: Crypto.randomUUID(), name: "অন্যান্য", type: "expense", is_default: true }
+      ];
+
+      await FileSystem.writeAsStringAsync(
+        BUSINESS_FILE,
+        JSON.stringify(businesses)
+      );
+      await FileSystem.writeAsStringAsync(BOOK_FILE, JSON.stringify(books));
+      await FileSystem.writeAsStringAsync(
+        CATEGORIES_FILE,
+        JSON.stringify(categories)
+      );
+      await FileSystem.writeAsStringAsync(
+        APP_SETTINGS_FILE,
+        JSON.stringify({
+          selected_business: businesses[0].id,
+        })
+      );
+
+      router.replace("/main");
+    } catch (error) {
+      console.error("ডাটাবেস ইনিশিয়ালাইজ করার সময় ত্রুটি:", error);
+      Toast.show({
         type: "error",
-        text1: "Failed to initialize database. Please try again.",
+        text1: "ডাটাবেস শুরু করতে ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
       });
-  } finally {
-    setLoading(false);
-  }
-};
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Welcome to CashMate</Text>
-        <Text style={styles.subtitle}>Organize your finances with ease</Text>
-        
+        <Text style={styles.title}>ক্যাশবুক BD এ স্বাগতম</Text>
+        <Text style={styles.subtitle}>সহজেই আপনার অর্থ ব্যবস্থাপনা করুন</Text>
+
         <View style={styles.featuresContainer}>
+          {/* New Feature: Business Account */}
+          <View style={styles.featureItem}>
+            <Text style={styles.featureIcon}>🏢</Text>
+            <Text style={styles.featureText}>প্রথমে ব্যবসা হিসাব খুলুন</Text>
+          </View>
+
           <View style={styles.featureItem}>
             <Text style={styles.featureIcon}>📚</Text>
-            <Text style={styles.featureText}>Multiple Books</Text>
+            <Text style={styles.featureText}>একাধিক খাতা</Text>
           </View>
-          
+
           <View style={styles.featureItem}>
             <Text style={styles.featureIcon}>🗂️</Text>
-            <Text style={styles.featureText}>Categories</Text>
+            <Text style={styles.featureText}>বিভিন্ন ক্যাটাগরি</Text>
           </View>
-          
+
           <View style={styles.featureItem}>
             <Text style={styles.featureIcon}>💰</Text>
-            <Text style={styles.featureText}>Track Income/Expenses</Text>
+            <Text style={styles.featureText}>আয়/খরচ ট্র্যাক করুন</Text>
           </View>
 
           <View style={styles.featureItem}>
             <Text style={styles.featureIcon}>🧾</Text>
-            <Text style={styles.featureText}>Generate PDF Book Transactions</Text>
+            <Text style={styles.featureText}>
+              লেনদেনের PDF রিপোর্ট তৈরি করুন
+            </Text>
+          </View>
+
+          {/* New Feature: Data Backup & Restore */}
+          <View style={styles.featureItem}>
+            <Text style={styles.featureIcon}>💾</Text>
+            <Text style={styles.featureText}>ডাটা ব্যাকআপ ও রিস্টোর করুন</Text>
           </View>
         </View>
       </View>
 
-      <TouchableOpacity 
-        style={styles.button} 
+      <TouchableOpacity
+        style={styles.button}
         onPress={initializeDatabase}
         disabled={loading}
       >
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.buttonText}>Get Started</Text>
+          <Text style={styles.buttonText}>শুরু করুন</Text>
         )}
       </TouchableOpacity>
     </View>
@@ -158,58 +143,66 @@ const initializeDatabase = async () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     padding: 20,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    fontFamily: "bangla_bold",
+    color: "#2c3e50",
     marginBottom: 10,
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    color: '#7f8c8d',
+    color: "#7f8c8d",
     marginBottom: 40,
-    textAlign: 'center',
+    textAlign: "center",
+    fontFamily: "bangla_semibold",
   },
   featuresContainer: {
-    width: '100%',
+    width: "100%",
     marginBottom: 40,
   },
   featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 12,
     paddingHorizontal: 20,
   },
   featureIcon: {
-    fontSize: 24,
+    fontSize: 20,
     marginRight: 15,
     width: 40,
-    textAlign: 'center',
+    textAlign: "center",
   },
   featureText: {
-    fontSize: 16,
-    color: '#34495e',
+    fontSize: 15,
+    color: "#34495e",
+    fontFamily: "bangla_medium",
+    flex: 1,
   },
   button: {
-    backgroundColor: '#3498db',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
+    backgroundColor: "#3b82f6",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
     marginBottom: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   buttonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: "white",
+    fontSize: 17,
+    fontFamily: "bangla_semibold",
   },
 });

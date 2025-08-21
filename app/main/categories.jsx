@@ -1,21 +1,25 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Crypto from "expo-crypto";
+import * as FileSystem from 'expo-file-system';
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import Toast from "react-native-toast-message";
 import CreateCategoryModal from "../../components/CreateCategoryModal";
 import { useStore } from "../../utils/z-store";
 
+const CATEGORIES_FILE = FileSystem.documentDirectory + 'categories.json';
+
 export default function Categories() {
-  const { db, setDb } = useStore();
+  const { addTransactions } = useStore();
 
   const [categories, setCategories] = useState([]);
   const [filteredCategories, setFilteredCategories] = useState([]);
@@ -24,32 +28,47 @@ export default function Categories() {
   const [editCategory, setEditCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false); // ডিলিট মডালের স্টেট
+  const [categoryToDelete, setCategoryToDelete] = useState(null); // ডিলিট করার ক্যাটাগরি
 
   useEffect(() => {
-    const initDB = async () => {
+    const loadCategories = async () => {
       try {
-        const SQLite = await import("expo-sqlite");
-        const database = await SQLite.openDatabaseAsync("cashbookbd.db");
-        setDb(database);
-        await loadCategories(database);
+        const fileInfo = await FileSystem.getInfoAsync(CATEGORIES_FILE);
+        if (fileInfo.exists) {
+          const content = await FileSystem.readAsStringAsync(CATEGORIES_FILE);
+          const loadedCategories = JSON.parse(content);
+          setCategories(loadedCategories);
+          setFilteredCategories(loadedCategories);
+        } else {
+          // Create default categories if file doesn't exist
+          const defaultCategories = [
+            { id: Crypto.randomUUID(), name: "বেতন", type: "income", is_default: true },
+            { id: Crypto.randomUUID(), name: "বিক্রয়", type: "income", is_default: true },
+            { id: Crypto.randomUUID(), name: "অন্যান্য আয়", type: "income", is_default: true },
+            { id: Crypto.randomUUID(), name: "কাঁচামাল", type: "expense", is_default: true },
+            { id: Crypto.randomUUID(), name: "বিদ্যুৎ বিল", type: "expense", is_default: true },
+            { id: Crypto.randomUUID(), name: "অন্যান্য খরচ", type: "expense", is_default: true },
+            { id: Crypto.randomUUID(), name: "অন্যান্য", type: "expense", is_default: true }
+          ];
+          await FileSystem.writeAsStringAsync(CATEGORIES_FILE, JSON.stringify(defaultCategories));
+          setCategories(defaultCategories);
+          setFilteredCategories(defaultCategories);
+        }
       } catch (error) {
         Toast.show({
           type: "error",
-          text1: "Failed to initialize database",
+          text1: "ক্যাটাগরি লোড করতে ব্যর্থ হয়েছে",
+          text2: "দয়া করে আবার চেষ্টা করুন"
         });
-        console.error("Database error:", error);
+        console.error("Load categories error:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    if (!db) {
-      initDB();
-    } else {
-      loadCategories(db);
-      setLoading(false);
-    }
-  }, [db, setDb]);
+    loadCategories();
+  }, []);
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -62,88 +81,81 @@ export default function Categories() {
     }
   }, [searchQuery, categories]);
 
-  const loadCategories = async (database) => {
-    try {
-      const results = await database.getAllAsync(
-        "SELECT * FROM categories ORDER BY name ASC"
-      );
-      setCategories(results);
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Failed to load categories",
-      });
-      console.error("Load categories error:", error);
-    }
-  };
-
   const handleAddCategory = async () => {
     if (!newCategory.trim()) {
       Toast.show({
         type: "error",
-        text1: "Category name cannot be empty",
+        text1: "ক্যাটাগরির নাম খালি রাখা যাবে না",
       });
       return;
     }
 
     try {
-      const existing = await db.getFirstAsync(
-        "SELECT id FROM categories WHERE name = ? LIMIT 1",
-        [newCategory]
+      const existing = categories.find(cat => 
+        cat.name.toLowerCase() === newCategory.toLowerCase()
       );
+      
       if (existing) {
         Toast.show({
           type: "error",
-          text1: `"${newCategory}" already exists.`,
+          text1: `"${newCategory}" নামে ইতিমধ্যে একটি ক্যাটাগরি আছে`,
         });
         return;
       }
 
+      let updatedCategories;
       if (editCategory) {
-        if (editCategory.name === "Others") {
+        if (editCategory.is_default) {
           Toast.show({
             type: "error",
-            text1: "'Others' category can't be modified",
+            text1: "ডিফল্ট ক্যাটাগরি সম্পাদনা করা যাবে না",
           });
           return;
         }
-        await db.runAsync("UPDATE categories SET name = ? WHERE id = ?", [
-          newCategory,
-          editCategory.id,
-        ]);
+        
+        updatedCategories = categories.map(cat => 
+          cat.id === editCategory.id ? { ...cat, name: newCategory } : cat
+        );
+        
         Toast.show({
           type: "success",
-          text1: "Category updated",
+          text1: "ক্যাটাগরি আপডেট করা হয়েছে",
         });
       } else {
-        await db.runAsync(
-          "INSERT INTO categories (name, is_default) VALUES (?, ?)",
-          [newCategory, false]
-        );
+        const newCat = {
+          id: Crypto.randomUUID(),
+          name: newCategory,
+          type: "expense",
+          is_default: false
+        };
+        
+        updatedCategories = [...categories, newCat];
         Toast.show({
           type: "success",
-          text1: "Category added",
+          text1: "নতুন ক্যাটাগরি যোগ করা হয়েছে",
         });
       }
 
+      await FileSystem.writeAsStringAsync(CATEGORIES_FILE, JSON.stringify(updatedCategories));
+      
+      setCategories(updatedCategories);
       setModalVisible(false);
       setNewCategory("");
       setEditCategory(null);
-      await loadCategories(db);
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: "Failed to save category",
+        text1: "ক্যাটাগরি সংরক্ষণ করতে ব্যর্থ হয়েছে",
       });
       console.error("Save error:", error);
     }
   };
 
   const handleEdit = (cat) => {
-    if (cat.name === "Others") {
+    if (cat.is_default) {
       Toast.show({
         type: "error",
-        text1: "Others' category can't be edited",
+        text1: "ডিফল্ট ক্যাটাগরি সম্পাদনা করা যাবে না",
       });
       return;
     }
@@ -153,59 +165,57 @@ export default function Categories() {
   };
 
   const handleDelete = (cat) => {
-    if (cat.is_default || cat.name === "Others") {
-      Alert.alert("Info", "Default categories can't be deleted.");
+    if (cat.is_default) {
+      Toast.show({
+        type: "error",
+        text1: "ডিফল্ট ক্যাটাগরি ডিলিট করা যাবে না",
+      });
       return;
     }
-    Alert.alert("Delete Category", `Delete "${cat.name}"?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => deleteCategory(cat.id),
-      },
-    ]);
+    
+    // মডাল দেখানোর জন্য ক্যাটাগরি সেট করুন
+    setCategoryToDelete(cat);
+    setShowDeleteModal(true);
   };
 
-  const deleteCategory = async (id) => {
+  const confirmDelete = async () => {
+    if (!categoryToDelete) return;
+    
     try {
-      const others = await db.getFirstAsync(
-        "SELECT id FROM categories WHERE name = 'Others'"
-      );
-      if (!others) {
+      const othersCategory = categories.find(cat => cat.name === "অন্যান্য খরচ");
+      if (!othersCategory) {
         Toast.show({
           type: "error",
-          text1: "'Others' category not found",
+          text1: "'অন্যান্য খরচ' ক্যাটাগরি পাওয়া যায়নি",
         });
         return;
       }
-
-      await db.runAsync("UPDATE transactions SET cat_id = ? WHERE cat_id = ?", [
-        others.id,
-        id,
-      ]);
-      await db.runAsync("DELETE FROM categories WHERE id = ?", [id]);
-
+      
+      const updatedCategories = categories.filter(cat => cat.id !== categoryToDelete.id);
+      await FileSystem.writeAsStringAsync(CATEGORIES_FILE, JSON.stringify(updatedCategories));
+      
+      setCategories(updatedCategories);
+      setShowDeleteModal(false);
+      setCategoryToDelete(null);
+      
       Toast.show({
         type: "success",
-        text1: "Category deleted successfully",
+        text1: "ক্যাটাগরি সফলভাবে ডিলিট করা হয়েছে",
       });
-
-      await loadCategories(db);
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: "Failed to delete category",
+        text1: "ক্যাটাগরি ডিলিট করতে ব্যর্থ হয়েছে",
       });
       console.error("Delete error:", error);
     }
   };
 
-  if (loading || !db) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading categories...</Text>
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text style={styles.loadingText}>ক্যাটাগরি লোড হচ্ছে...</Text>
       </View>
     );
   }
@@ -216,7 +226,7 @@ export default function Categories() {
       <View style={styles.searchBar}>
         <Ionicons name="search" size={20} color="#888" />
         <TextInput
-          placeholder="Search categories..."
+          placeholder="ক্যাটাগরি খুঁজুন..."
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -226,7 +236,7 @@ export default function Categories() {
       {/* Category List */}
       <FlatList
         data={filteredCategories}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingVertical: 12 }}
         renderItem={({ item }) => (
           <View style={styles.categoryItem}>
@@ -236,12 +246,12 @@ export default function Categories() {
                 <Ionicons
                   name="create-outline"
                   size={20}
-                  color={item.name === "Others" ? "#ccc" : "#007AFF"}
+                  color={item.is_default ? "#ccc" : "#3b82f6"}
                 />
               </TouchableOpacity>
-              {!item.is_default && item.name !== "Others" && (
+              {!item.is_default && (
                 <TouchableOpacity onPress={() => handleDelete(item)}>
-                  <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                  <Ionicons name="trash-outline" size={20} color="#ef4444" />
                 </TouchableOpacity>
               )}
             </View>
@@ -252,8 +262,8 @@ export default function Categories() {
             <Ionicons name="folder-open-outline" size={48} color="#ccc" />
             <Text style={styles.emptyText}>
               {searchQuery
-                ? "No matching categories found"
-                : "No categories yet"}
+                ? "মিলে যায় এমন কোনো ক্যাটাগরি পাওয়া যায়নি"
+                : "কোনো ক্যাটাগরি নেই"}
             </Text>
           </View>
         )}
@@ -271,7 +281,7 @@ export default function Categories() {
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
 
-      {/* Modal */}
+      {/* Create/Edit Category Modal */}
       <CreateCategoryModal
         modalVisible={modalVisible}
         setModalVisible={setModalVisible}
@@ -281,10 +291,40 @@ export default function Categories() {
         editCategory={editCategory}
         handleAddCategory={handleAddCategory}
       />
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>ক্যাটাগরি ডিলিট করুন</Text>
+            <Text style={styles.modalMessage}>
+              আপনি কি নিশ্চিত যে আপনি {categoryToDelete?.name} ক্যাটাগরি ডিলিট করতে চান?
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>বাতিল</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.deleteButtonModal]}
+                onPress={confirmDelete}
+              >
+                <Text style={styles.deleteButtonText}>ডিলিট করুন</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -298,7 +338,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     marginTop: 16,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 4,
     borderRadius: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -308,8 +348,8 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
     marginLeft: 8,
+    fontFamily: 'bangla_regular'
   },
   categoryItem: {
     backgroundColor: "#fff",
@@ -326,9 +366,9 @@ const styles = StyleSheet.create({
     elevation: 0.5,
   },
   categoryName: {
-    fontSize: 16,
     fontWeight: "500",
     color: "#1f2937",
+    fontFamily: 'bangla_medium'
   },
   actions: {
     flexDirection: "row",
@@ -342,6 +382,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     color: "#777",
+    textAlign: 'center',
   },
   fab: {
     position: "absolute",
@@ -350,7 +391,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#007AFF",
+    backgroundColor: "#3b82f6",
     justifyContent: "center",
     alignItems: "center",
     elevation: 4,
@@ -364,5 +405,59 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: "#666",
+  },
+  // মডাল স্টাইলস
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 20,
+    width: "100%",
+    maxWidth: 350,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: 'bangla_bold',
+    marginBottom: 10,
+    textAlign: "center",
+    color: "#333",
+  },
+  modalMessage: {
+    fontFamily: 'bangla_regular',
+    marginBottom: 20,
+    textAlign: "center",
+    color: "#555",
+    lineHeight: 22,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: "#e5e7eb",
+  },
+  deleteButtonModal: {
+    backgroundColor: "#ef4444",
+  },
+  cancelButtonText: {
+    color: "#333",
+    fontFamily: 'bangla_semibold',
+  },
+  deleteButtonText: {
+    color: "#fff",
+    fontFamily: 'bangla_semibold',
   },
 });

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from 'expo-file-system';
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -11,14 +12,14 @@ import {
   View
 } from "react-native";
 import Toast from "react-native-toast-message";
-import BookUpdateModal from "../../components/BookUpdateModal";
 import BookBalanceSummery from "../../components/BookBalanceSummery";
 import BookMenu from "../../components/BookMenu";
+import BookUpdateModal from "../../components/BookUpdateModal";
 import TransactionButton from "../../components/TransactionButton";
 import TransactionItem from "../../components/TransactionItem";
-import { getBooks } from "../../utils/bookController";
-import { fetchTransactions } from "../../utils/transactionController";
 import { useStore } from "../../utils/z-store";
+
+const TRANSACTIONS_FILE = (bookId) => FileSystem.documentDirectory + `book_${bookId}.json`;
 
 export default function BookDetails() {
   const params = useLocalSearchParams();
@@ -26,8 +27,6 @@ export default function BookDetails() {
   const id = params.id;
 
   const {
-    db,
-    setDb,
     books,
     addBooks,
     transactions,
@@ -41,32 +40,33 @@ export default function BookDetails() {
   const [newBookName, setNewBookName] = useState(book?.name || "");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // DB init if not already
+  // Load transactions from JSON file
   useEffect(() => {
-    const openDb = async () => {
+    const loadTransactions = async () => {
       try {
-        const SQLite = await import("expo-sqlite");
-        const database = await SQLite.openDatabaseAsync("cashbookbd.db");
-        setDb(database);
+        setLoading(true);
+        const filePath = TRANSACTIONS_FILE(id);
+        const fileInfo = await FileSystem.getInfoAsync(filePath);
+
+        if (fileInfo.exists) {
+          const fileContent = await FileSystem.readAsStringAsync(filePath);
+          const loadedTransactions = JSON.parse(fileContent);
+          addTransactions(loadedTransactions);
+        } else {
+          // Create new empty transactions file if doesn't exist
+          await FileSystem.writeAsStringAsync(filePath, JSON.stringify([]));
+          addTransactions([]);
+        }
       } catch (err) {
-        console.error("Database open failed:", err);
-        setError("Failed to open database.");
+        console.error("Failed to load transactions:", err);
+        setError("Failed to load transactions");
+      } finally {
         setLoading(false);
       }
     };
 
-    if (!db) {
-      openDb();
-    }
-  }, []);
-
-  // Load transactions and books when db ready
-  useEffect(() => {
-    if (db) {
-      fetchTransactions(db, id, addTransactions, setError, setLoading);
-      getBooks(db, addBooks);
-    }
-  }, [db, id]);
+    loadTransactions();
+  }, [id]);
 
   const transactionsWithBalance = useMemo(() => {
     let balance = 0;
@@ -74,8 +74,8 @@ export default function BookDetails() {
       .slice()
       .reverse()
       .map((transaction) => {
-        balance = transaction.cashin
-          ? balance + transaction.amount
+        balance = transaction.type === 'income' 
+          ? balance + transaction.amount 
           : balance - transaction.amount;
         return { ...transaction, runningBalance: balance };
       })
@@ -89,7 +89,7 @@ export default function BookDetails() {
       (t) =>
         t.remark?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.amount.toString().includes(searchQuery) ||
-        t.category_name?.toLowerCase().includes(searchQuery.toLowerCase())
+        t.category?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery, transactionsWithBalance]);
 
@@ -105,13 +105,21 @@ export default function BookDetails() {
     }
 
     try {
-      await db.runAsync("UPDATE books SET name = ? WHERE id = ?", [
-        newBookName,
-        id,
-      ]);
+      // Update in books.json
+      const booksPath = FileSystem.documentDirectory + 'books.json';
+      const booksContent = await FileSystem.readAsStringAsync(booksPath);
+      const allBooks = JSON.parse(booksContent);
+      
+      const updatedBooks = allBooks.map(b => 
+        b.id === id ? {...b, name: newBookName, updated_at: new Date().toISOString()} : b
+      );
+      
+      await FileSystem.writeAsStringAsync(booksPath, JSON.stringify(updatedBooks));
+      
+      // Update local state
+      addBooks(updatedBooks);
       setEditModalVisible(false);
-      book.name = newBookName;
-      getBooks(db, addBooks);
+      
       Toast.show({
         type: "success",
         text1: "Book name updated successfully",
@@ -125,7 +133,7 @@ export default function BookDetails() {
     }
   };
 
-  if (loading || !db) {
+  if (loading) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" />
@@ -145,7 +153,7 @@ export default function BookDetails() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: books.find((b) => b.id === book.id)?.name || "Book Details",
+          title: books.find((b) => b.id === id)?.name || "Book Details",
           headerRight: () => (
             <TouchableOpacity onPress={handleMenuPress}>
               <Ionicons name="ellipsis-vertical" size={20} />
@@ -156,7 +164,6 @@ export default function BookDetails() {
 
       {menuVisible && (
         <BookMenu
-          db={db}
           id={id}
           book={book}
           transactions={transactionsWithBalance}
@@ -177,7 +184,7 @@ export default function BookDetails() {
         <Ionicons name="search" size={20} color="#666" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by remark or amount"
+          placeholder="টাকার পরিমাণ, মন্তব্য, ক্যাটাগরি দিয়ে খুঁজুন"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -192,7 +199,7 @@ export default function BookDetails() {
       {displayedTransactions.length > 0 ? (
         <FlatList
           data={displayedTransactions}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <TransactionItem
               transaction={item}
@@ -237,12 +244,13 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     marginLeft: 8,
-    fontSize: 16,
+    fontFamily : 'bangla_regular'
   },
   transactionCount: {
     fontSize: 14,
     color: "#666",
     marginBottom: 8,
+    fontFamily : 'bangla_regular'
   },
   listContainer: {
     paddingBottom: 100,
@@ -252,6 +260,7 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
     marginTop: 20,
+    fontFamily : 'bangla_regular'
   },
   errorText: {
     fontSize: 16,

@@ -14,18 +14,22 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Modal, // Modal ইম্পোর্ট করুন
 } from "react-native";
 import Toast from "react-native-toast-message";
+import * as FileSystem from 'expo-file-system';
 import TransactionTransferModal from "../../components/TransactionTransferModal";
-import { getTransactions } from "../../utils/transactionController";
 import { useStore } from "../../utils/z-store";
-import { getBooks } from "../../utils/bookController";
+
+const TRANSACTIONS_FILE = (bookId) => FileSystem.documentDirectory + `book_${bookId}.json`;
+const CATEGORIES_FILE = FileSystem.documentDirectory + 'categories.json';
+const BOOKS_FILE = FileSystem.documentDirectory + 'books.json';
 
 export default function TransactionDetails() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const transaction = params.transaction ? JSON.parse(params.transaction) : null;
-  const { db, setDb, addTransactions, addBooks, books } = useStore();
+  const { addTransactions, books } = useStore();
 
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState(transaction?.amount?.toString() || "");
@@ -33,97 +37,117 @@ export default function TransactionDetails() {
   const [date, setDate] = useState(transaction?.date ? new Date(transaction.date) : new Date());
   const [time, setTime] = useState(transaction?.time ? new Date(`1970-01-01T${transaction.time}`) : new Date());
   const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(transaction?.cat_id || null);
+  const [selectedCategory, setSelectedCategory] = useState(transaction?.category_id || null);
   const [selectedBook, setSelectedBook] = useState(transaction?.book_id || null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [currentBookName, setCurrentBookName] = useState("");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [type, setType] = useState(transaction?.cashin ? "cashin" : "cashout");
+  const [type, setType] = useState(transaction?.type || "income");
+  const [showDeleteModal, setShowDeleteModal] = useState(false); // ডিলিট মডালের স্টেট
 
   useEffect(() => {
-    const initDbAndLoadData = async () => {
+    const loadData = async () => {
       try {
-        if (!db) {
-          const SQLite = await import("expo-sqlite");
-          const database = await SQLite.openDatabaseAsync("cashbookbd.db");
-          setDb(database);
-          return;
-        }
-
-        const categoryResults = await db.getAllAsync("SELECT id, name FROM categories ORDER BY name ASC");
-        setCategories(categoryResults);
-
-        const bookResults = await db.getAllAsync("SELECT id, name FROM books");
-        addBooks(bookResults);
-
-        if (transaction?.book_id) {
-          const currentBook = await db.getFirstAsync("SELECT name FROM books WHERE id = ?", [
-            transaction.book_id,
-          ]);
-          setCurrentBookName(currentBook?.name || "Unknown");
-        }
-      } catch (err) {
-        Toast.show({ type: "error", text1: "Failed to load transaction data" });
-        console.error(err);
-      } finally {
+        // Load categories
+        const categoriesContent = await FileSystem.readAsStringAsync(CATEGORIES_FILE);
+        setCategories(JSON.parse(categoriesContent));
+        
+        // Set current book name
+        const booksContent = await FileSystem.readAsStringAsync(BOOKS_FILE);
+        const allBooks = JSON.parse(booksContent);
+        const currentBook = allBooks.find(b => b.id === transaction?.book_id);
+        setCurrentBookName(currentBook?.name || "অজানা");
+        
         setLoading(false);
+      } catch (err) {
+        Toast.show({ 
+          type: "error", 
+          text1: "লেনদেন ডেটা লোড করতে ব্যর্থ হয়েছে",
+          text2: "দয়া করে আবার চেষ্টা করুন"
+        });
+        console.error(err);
       }
     };
 
-    initDbAndLoadData();
-  }, [db]);
+    loadData();
+  }, []);
 
   const handleUpdate = async () => {
     if (!amount.trim() || !selectedCategory) {
-      Toast.show({ type: "error", text1: "Amount and Category are required" });
+      Toast.show({ 
+        type: "error", 
+        text1: "পরিমাণ এবং বিভাগ প্রয়োজন",
+        text2: "অনুগ্রহ করে সমস্ত প্রয়োজনীয় তথ্য পূরণ করুন"
+      });
       return;
     }
 
     try {
-      await db.runAsync(
-        "UPDATE transactions SET amount = ?, remark = ?, date = ?, time = ?, cat_id = ?, cashin = ?, cashout = ? WHERE id = ?",
-        [
-          parseFloat(amount),
+      const filePath = TRANSACTIONS_FILE(transaction.book_id);
+      const content = await FileSystem.readAsStringAsync(filePath);
+      let transactions = JSON.parse(content);
+      
+      // Update the transaction
+      transactions = transactions.map(t => 
+        t.id === transaction.id ? {
+          ...t,
+          amount: parseFloat(amount),
           remark,
-          date.toISOString().split("T")[0],
-          time.toTimeString().substring(0, 8),
-          selectedCategory,
-          type === "cashin" ? 1 : 0,
-          type === "cashout" ? 1 : 0,
-          transaction.id,
-        ]
+          date: date.toISOString().split("T")[0],
+          time: time.toTimeString().substring(0, 8),
+          category_id: selectedCategory,
+          category: categories.find(c => c.id === selectedCategory)?.name || "",
+          type
+        } : t
       );
-      await getTransactions(db, transaction.book_id, addTransactions);
-      await getBooks(db, addBooks);
-      Toast.show({ type: "success", text1: "Transaction updated successfully" });
+
+      await FileSystem.writeAsStringAsync(filePath, JSON.stringify(transactions));
+      addTransactions(transactions);
+      
+      Toast.show({ 
+        type: "success", 
+        text1: "লেনদেন সফলভাবে আপডেট করা হয়েছে",
+        text2: `${parseFloat(amount).toLocaleString()} টাকা আপডেট করা হয়েছে`
+      });
       router.back();
     } catch (err) {
-      Toast.show({ type: "error", text1: "Failed to update transaction" });
+      Toast.show({ 
+        type: "error", 
+        text1: "লেনদেন আপডেট করতে ব্যর্থ হয়েছে",
+        text2: "দয়া করে আবার চেষ্টা করুন"
+      });
       console.error(err);
     }
   };
 
   const handleDelete = () => {
-    Alert.alert("Delete", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await db.runAsync("DELETE FROM transactions WHERE id = ?", [transaction.id]);
-            await getTransactions(db, transaction.book_id, addTransactions);
-            await getBooks(db, addBooks);
-            Toast.show({ type: "success", text1: "Transaction deleted" });
-            router.back();
-          } catch (err) {
-            Toast.show({ type: "error", text1: "Failed to delete transaction" });
-            console.error(err);
-          }
-        },
-      },
-    ]);
+    setShowDeleteModal(true); // মডাল দেখান
+  };
+
+  const confirmDelete = async () => {
+    try {
+      const filePath = TRANSACTIONS_FILE(transaction.book_id);
+      const content = await FileSystem.readAsStringAsync(filePath);
+      let transactions = JSON.parse(content);
+      
+      transactions = transactions.filter(t => t.id !== transaction.id);
+      await FileSystem.writeAsStringAsync(filePath, JSON.stringify(transactions));
+      addTransactions(transactions);
+      
+      Toast.show({ 
+        type: "success", 
+        text1: "লেনদেন ডিলিট করা হয়েছে",
+      });
+      setShowDeleteModal(false); // মডাল বন্ধ করুন
+      router.back();
+    } catch (err) {
+      Toast.show({ 
+        type: "error", 
+        text1: "লেনদেন ডিলিট করতে ব্যর্থ হয়েছে",
+      });
+      console.error(err);
+    }
   };
 
   const onDateChange = (_, selectedDate) => {
@@ -139,7 +163,8 @@ export default function TransactionDetails() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text style={styles.loadingText}>লোড হচ্ছে...</Text>
       </View>
     );
   }
@@ -151,13 +176,13 @@ export default function TransactionDetails() {
     >
       <Stack.Screen
         options={{
-          title: "Transaction Details",
+          title: "লেনদেন বিবরণ",
           headerRight: () => (
             <TouchableOpacity
               onPress={() => setShowTransferModal(true)}
               style={styles.headerButton}
             >
-              <Ionicons name="swap-horizontal" size={24} color="#007AFF" />
+              <Ionicons name="swap-horizontal" size={24} color="#3b82f6" />
             </TouchableOpacity>
           ),
         }}
@@ -167,26 +192,26 @@ export default function TransactionDetails() {
         <View style={styles.formGroup}>
           <View style={styles.toggleGroup}>
             <TouchableOpacity
-              style={[styles.toggleButton, type === "cashin" && styles.activeButtonIn]}
-              onPress={() => setType("cashin")}
+              style={[styles.toggleButton, type === "income" && styles.activeButtonIn]}
+              onPress={() => setType("income")}
             >
-              <Text style={type === "cashin" ? styles.activeTextIn : styles.inactiveText}>Cash In</Text>
+              <Text style={type === "income" ? styles.activeTextIn : styles.inactiveText}>আয়</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.toggleButton, type === "cashout" && styles.activeButtonOut]}
-              onPress={() => setType("cashout")}
+              style={[styles.toggleButton, type === "expense" && styles.activeButtonOut]}
+              onPress={() => setType("expense")}
             >
-              <Text style={type === "cashout" ? styles.activeTextOut : styles.inactiveText}>Cash Out</Text>
+              <Text style={type === "expense" ? styles.activeTextOut : styles.inactiveText}>খরচ</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Amount */}
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Amount*</Text>
+          <Text style={styles.label}>পরিমাণ*</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter amount"
+            placeholder="টাকার পরিমাণ লিখুন"
             value={amount}
             onChangeText={setAmount}
             keyboardType="numeric"
@@ -195,13 +220,14 @@ export default function TransactionDetails() {
 
         {/* Category */}
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Category*</Text>
+          <Text style={styles.label}>বিভাগ*</Text>
           <View style={styles.pickerContainer}>
             <Picker
               selectedValue={selectedCategory}
               onValueChange={(value) => setSelectedCategory(value)}
+              dropdownIconColor="#3b82f6"
             >
-              <Picker.Item label="Select a category" value={null} />
+              <Picker.Item label="একটি বিভাগ নির্বাচন করুন" value={null} />
               {categories.map((cat) => (
                 <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
               ))}
@@ -211,15 +237,15 @@ export default function TransactionDetails() {
 
         {/* Date & Time */}
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Date & Time*</Text>
+          <Text style={styles.label}>তারিখ ও সময়*</Text>
           <View style={styles.datetimeContainer}>
             <TouchableOpacity style={styles.dateInput} onPress={() => setShowDatePicker(true)}>
-              <Text>{date.toLocaleDateString()}</Text>
-              <Ionicons name="calendar" size={20} color="#007AFF" />
+              <Text style={{fontFamily : 'bangla_regular'}}>{date.toLocaleDateString('bn-BD')}</Text>
+              <Ionicons name="calendar" size={20} color="#3b82f6" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.dateInput} onPress={() => setShowTimePicker(true)}>
-              <Text>{time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
-              <Ionicons name="time" size={20} color="#007AFF" />
+              <Text style={{fontFamily : 'bangla_regular'}}>{time.toLocaleTimeString('bn-BD', { hour: "2-digit", minute: "2-digit" })}</Text>
+              <Ionicons name="time" size={20} color="#3b82f6" />
             </TouchableOpacity>
           </View>
           {showDatePicker && (
@@ -232,14 +258,15 @@ export default function TransactionDetails() {
 
         {/* Remark */}
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Remark</Text>
+          <Text style={styles.label}>মন্তব্য</Text>
           <TextInput
             style={[styles.input, styles.multilineInput]}
-            placeholder="Enter remark"
+            placeholder="অতিরিক্ত তথ্য লিখুন (ঐচ্ছিক)"
             value={remark}
             onChangeText={setRemark}
             multiline
             numberOfLines={3}
+            textAlignVertical="top"
           />
         </View>
       </ScrollView>
@@ -254,12 +281,43 @@ export default function TransactionDetails() {
         transaction={transaction}
       />
 
+      {/* ডিলিট কনফার্মেশন মডাল */}
+      <Modal
+        visible={showDeleteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>ডিলিট করুন</Text>
+            <Text style={styles.modalMessage}>
+              আপনি কি নিশ্চিত যে আপনি এই লেনদেনটি ডিলিট করতে চান?
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>বাতিল</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.deleteButtonModal]}
+                onPress={confirmDelete}
+              >
+                <Text style={styles.deleteButtonText}>ডিলিট করুন</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.button, styles.deleteButton]}
           onPress={handleDelete}
         >
-          <Text style={styles.buttonText}>Delete</Text>
+          <Text style={styles.buttonText}>ডিলিট করুন</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -271,7 +329,7 @@ export default function TransactionDetails() {
           onPress={handleUpdate}
           disabled={!amount || !selectedCategory}
         >
-          <Text style={styles.buttonText}>Update</Text>
+          <Text style={styles.buttonText}>আপডেট করুন</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -280,19 +338,39 @@ export default function TransactionDetails() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8f9fa" },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  scrollContainer: { padding: 16, paddingBottom: 100 },
-  formGroup: { marginBottom: 20 },
-  label: { fontSize: 16, marginBottom: 8, color: "#555", fontWeight: "bold" },
+  centered: { 
+    flex: 1, 
+    justifyContent: "center", 
+    alignItems: "center" 
+  },
+  loadingText: {
+    marginTop: 10,
+    color: "#64748b",
+    fontFamily : 'bangla_regular',
+  },
+  scrollContainer: { 
+    padding: 16, 
+    paddingBottom: 100 
+  },
+  formGroup: { 
+    marginBottom: 20 
+  },
+  label: {  
+    marginBottom: 8, 
+    color: "#555", 
+    fontFamily : 'bangla_bold',
+  },
   input: {
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
     backgroundColor: "#fff",
   },
-  multilineInput: { minHeight: 80, textAlignVertical: "top" },
+  multilineInput: { 
+    minHeight: 80, 
+    textAlignVertical: "top" ,
+  },
   pickerContainer: {
     borderWidth: 1,
     borderColor: "#ddd",
@@ -325,42 +403,110 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     alignItems: "center",
-    width : '100%'
+    width: '100%'
   },
   activeButtonIn: {
-    backgroundColor: "rgba(0, 123, 255, 0.2)",
+    backgroundColor: "rgba(34, 197, 94, 0.2)",
   },
   activeButtonOut: {
-    backgroundColor: "rgba(231, 77, 60, 0.2)",
+    backgroundColor: "rgba(239, 68, 68, 0.2)",
   },
   activeTextIn: {
-    color: "#007AFF",
-    fontWeight: "bold",
+    color: "#22c55e",
+    fontFamily : 'bangla_bold',
   },
   activeTextOut: {
-    color: "#e74c3c",
-    fontWeight: "bold",
+    color: "#ef4444",
+    fontFamily : 'bangla_bold',
   },
   inactiveText: {
     color: "#333",
+    fontFamily : 'bangla_bold',
   },
   footer: {
     flexDirection: "row",
     padding: 16,
+    paddingBottom : 20,
     backgroundColor: "#f8f9fa",
     borderTopWidth: 1,
     borderTopColor: "#ddd",
   },
   button: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical : 12,
     borderRadius: 8,
     alignItems: "center",
     marginHorizontal: 5,
   },
-  updateButton: { backgroundColor: "#007AFF" },
-  deleteButton: { backgroundColor: "#e74c3c" },
-  disabledButton: { backgroundColor: "#a0a0a0" },
-  buttonText: { color: "#fff", fontWeight: "bold" },
-  headerButton: { marginRight: 16 },
+  updateButton: { 
+    backgroundColor: "#3b82f6" 
+  },
+  deleteButton: { 
+    backgroundColor: "#ef4444" 
+  },
+  disabledButton: { 
+    backgroundColor: "#a0a0a0" 
+  },
+  buttonText: { 
+    color: "#fff", 
+    fontFamily : 'bangla_bold',
+  },
+  headerButton: { 
+    marginRight: 16 
+  },
+  // মডাল স্টাইলস
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 20,
+    width: "100%",
+    maxWidth: 350,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: 'bangla_bold',
+    marginBottom: 10,
+    textAlign: "center",
+    color: "#333",
+  },
+  modalMessage: {
+    fontFamily: 'bangla_regular',
+    marginBottom: 20,
+    textAlign: "center",
+    color: "#555",
+    lineHeight: 22,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: "#e5e7eb",
+  },
+  deleteButtonModal: {
+    backgroundColor: "#ef4444",
+  },
+  cancelButtonText: {
+    color: "#333",
+    fontFamily: 'bangla_bold',
+  },
+  deleteButtonText: {
+    color: "#fff",
+    fontFamily: 'bangla_bold',
+  },
 });

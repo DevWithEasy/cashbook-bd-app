@@ -1,8 +1,9 @@
 import { TouchableOpacity, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from '@expo/vector-icons';
 
 const getCategoryColor = (categoryName) => {
-  if (!categoryName) return "#CCCCCC";
+  if (!categoryName) return "#e5e7eb";
 
   let hash = 0;
   for (let i = 0; i < categoryName.length; i++) {
@@ -10,12 +11,12 @@ const getCategoryColor = (categoryName) => {
   }
 
   const hue = Math.abs(hash % 360);
-  return `hsl(${hue}, 70%, 95%)`;
+  return `hsl(${hue}, 70%, 90%)`;
 };
 
 export default function TransactionItem({ transaction, runningBalance }) {
   const router = useRouter();
-  const categoryColor = getCategoryColor(transaction.category_name);
+  const categoryColor = getCategoryColor(transaction.category);
 
   const handleTransactionPress = () => {
     router.push({
@@ -27,56 +28,58 @@ export default function TransactionItem({ transaction, runningBalance }) {
   return (
     <TouchableOpacity
       onPress={handleTransactionPress}
-      activeOpacity={0.7} // প্রেস করলে opacity হালকা হবে, আর কিছু নয়
+      activeOpacity={0.7}
       style={styles.transactionItem}
     >
-      <View>
-        {/* First Row */}
+      <View style={styles.contentContainer}>
+        {/* First Row - Category and Amount */}
         <View style={styles.firstRow}>
-          <View
-            style={[
-              styles.categoryContainer,
-              { backgroundColor: categoryColor },
-            ]}
-          >
-            <Text
-              style={styles.categoryText}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {transaction.category_name || "Uncategorized"}
-            </Text>
+          <View style={styles.categoryRow}>
+            <View
+              style={[
+                styles.categoryIndicator,
+                { backgroundColor: categoryColor },
+              ]}
+            />
+            <View style={styles.categoryTextContainer}>
+              <Text
+                style={styles.categoryText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {transaction.category || "বিভাগহীন"}
+              </Text>
+            </View>
           </View>
-
+          
           <Text
-            style={transaction.cashin ? styles.incomeText : styles.expenseText}
+            style={transaction.type === 'income' ? styles.incomeText : styles.expenseText}
           >
-            {transaction.amount.toLocaleString()}
+            {transaction.type === 'income' ? '+' : '-'} {transaction.amount.toLocaleString('bn-BD')}
           </Text>
         </View>
 
-        {/* Balance */}
-        <View style={styles.balanceContainer}>
-          <Text style={styles.balanceText}>
-            Balance: {runningBalance.toLocaleString()}
-          </Text>
-        </View>
-
-        {/* Remark */}
+        {/* Second Row - Remark */}
         {transaction.remark && (
           <Text
             style={styles.remarkText}
             numberOfLines={1}
             ellipsizeMode="tail"
           >
-            {transaction.remark}
+            <Ionicons name="document-text-outline" size={14} color="#6b7280" /> {transaction.remark}
           </Text>
         )}
 
-        {/* Date & Time */}
-        <Text style={styles.dateText}>
-          {transaction.date} • {transaction.time}
-        </Text>
+        {/* Third Row - Date, Time and Balance */}
+        <View style={styles.bottomRow}>
+          <Text style={styles.dateText}>
+            <Ionicons name="calendar-outline" size={12} color="#9ca3af" /> {new Date(transaction.date).toLocaleDateString('bn-BD')} • <Ionicons name="time-outline" size={12} color="#9ca3af" /> {transaction.time}
+          </Text>
+          
+          <Text style={styles.balanceText}>
+            ব্যালেন্স: {runningBalance.toLocaleString('bn-BD')}
+          </Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -87,50 +90,75 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 16,
     marginBottom: 12,
-    borderRadius: 8,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  contentContainer: {
+    flex: 1,
   },
   firstRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  categoryContainer: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  categoryIndicator: {
+    width: 4,
+    height: 20,
+    borderRadius: 2,
+    marginRight: 8,
+  },
+  categoryTextContainer: {
+    flex: 1,
   },
   categoryText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#333",
+    fontSize: 14,
+    fontFamily : 'bangla_semibold',
+    color: "#1f2937",
   },
   incomeText: {
     fontSize: 16,
-    fontWeight: "bold",
-    color: "#4CAF50",
+    fontFamily : 'bangla_bold',
+    color: "#22c55e",
   },
   expenseText: {
     fontSize: 16,
-    fontWeight: "bold",
-    color: "#F44336",
+    fontFamily : 'bangla_bold',
+    color: "#ef4444",
   },
-  balanceContainer: {
-    alignItems: "flex-end",
-    marginBottom: 6,
-  },
-  balanceText: {
-    fontSize: 12,
-    color: "#666",
-    fontWeight: "500",
+  bottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
   },
   remarkText: {
-    color: "#666",
+    color: "#6b7280",
+    fontSize: 13,
+    fontFamily : 'bangla_regular',
     marginBottom: 6,
-    fontStyle: "italic",
   },
   dateText: {
     fontSize: 12,
-    color: "#999",
+    color: "#9ca3af",
+    flex: 1,
+    fontFamily : 'bangla_regular',
+  },
+  balanceText: {
+    fontSize: 12,
+    color: "#4b5563",
+    fontFamily : 'bangla_semibold',
   },
 });
