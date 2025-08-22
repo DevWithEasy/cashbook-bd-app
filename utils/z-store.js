@@ -1,8 +1,10 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
 export const useStore = create((set) => ({
+  selectedBusiness: {},
   books: [],
   transactions: [],
+  addselectedBusiness: (business) => set(() => ({ selectedBusiness : business })),
   addBooks: (books) => set(() => ({ books })),
 
   // Add a transaction

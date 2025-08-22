@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import * as Crypto from "expo-crypto";
-import * as FileSystem from 'expo-file-system';
-import { useEffect, useState } from "react";
+import * as FileSystem from "expo-file-system";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -10,13 +11,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
-import Toast from "react-native-toast-message";
 import CreateCategoryModal from "../../components/CreateCategoryModal";
 import { useStore } from "../../utils/z-store";
 
-const CATEGORIES_FILE = FileSystem.documentDirectory + 'categories.json';
+const CATEGORIES_FILE = FileSystem.documentDirectory + "categories.json";
 
 export default function Categories() {
   const { addTransactions } = useStore();
@@ -28,47 +28,81 @@ export default function Categories() {
   const [editCategory, setEditCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
-  const [showDeleteModal, setShowDeleteModal] = useState(false); // ডিলিট মডালের স্টেট
-  const [categoryToDelete, setCategoryToDelete] = useState(null); // ডিলিট করার ক্যাটাগরি
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
 
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const fileInfo = await FileSystem.getInfoAsync(CATEGORIES_FILE);
-        if (fileInfo.exists) {
-          const content = await FileSystem.readAsStringAsync(CATEGORIES_FILE);
-          const loadedCategories = JSON.parse(content);
-          setCategories(loadedCategories);
-          setFilteredCategories(loadedCategories);
-        } else {
-          // Create default categories if file doesn't exist
-          const defaultCategories = [
-            { id: Crypto.randomUUID(), name: "বেতন", type: "income", is_default: true },
-            { id: Crypto.randomUUID(), name: "বিক্রয়", type: "income", is_default: true },
-            { id: Crypto.randomUUID(), name: "অন্যান্য আয়", type: "income", is_default: true },
-            { id: Crypto.randomUUID(), name: "কাঁচামাল", type: "expense", is_default: true },
-            { id: Crypto.randomUUID(), name: "বিদ্যুৎ বিল", type: "expense", is_default: true },
-            { id: Crypto.randomUUID(), name: "অন্যান্য খরচ", type: "expense", is_default: true },
-            { id: Crypto.randomUUID(), name: "অন্যান্য", type: "expense", is_default: true }
-          ];
-          await FileSystem.writeAsStringAsync(CATEGORIES_FILE, JSON.stringify(defaultCategories));
-          setCategories(defaultCategories);
-          setFilteredCategories(defaultCategories);
-        }
-      } catch (error) {
-        Toast.show({
-          type: "error",
-          text1: "ক্যাটাগরি লোড করতে ব্যর্থ হয়েছে",
-          text2: "দয়া করে আবার চেষ্টা করুন"
-        });
-        console.error("Load categories error:", error);
-      } finally {
-        setLoading(false);
+  const loadCategories = async () => {
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(CATEGORIES_FILE);
+      if (fileInfo.exists) {
+        const content = await FileSystem.readAsStringAsync(CATEGORIES_FILE);
+        const loadedCategories = JSON.parse(content);
+        setCategories(loadedCategories);
+        setFilteredCategories(loadedCategories);
+      } else {
+        const defaultCategories = [
+          {
+            id: Crypto.randomUUID(),
+            name: "বেতন",
+            type: "income",
+            is_default: true,
+          },
+          {
+            id: Crypto.randomUUID(),
+            name: "বিক্রয়",
+            type: "income",
+            is_default: true,
+          },
+          {
+            id: Crypto.randomUUID(),
+            name: "অন্যান্য আয়",
+            type: "income",
+            is_default: true,
+          },
+          {
+            id: Crypto.randomUUID(),
+            name: "কাঁচামাল",
+            type: "expense",
+            is_default: true,
+          },
+          {
+            id: Crypto.randomUUID(),
+            name: "বিদ্যুৎ বিল",
+            type: "expense",
+            is_default: true,
+          },
+          {
+            id: Crypto.randomUUID(),
+            name: "অন্যান্য খরচ",
+            type: "expense",
+            is_default: true,
+          },
+          {
+            id: Crypto.randomUUID(),
+            name: "অন্যান্য",
+            type: "expense",
+            is_default: true,
+          },
+        ];
+        await FileSystem.writeAsStringAsync(
+          CATEGORIES_FILE,
+          JSON.stringify(defaultCategories)
+        );
+        setCategories(defaultCategories);
+        setFilteredCategories(defaultCategories);
       }
-    };
+    } catch (error) {
+      console.error("Load categories error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    loadCategories();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadCategories();
+    }, [])
+  );
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -83,80 +117,57 @@ export default function Categories() {
 
   const handleAddCategory = async () => {
     if (!newCategory.trim()) {
-      Toast.show({
-        type: "error",
-        text1: "ক্যাটাগরির নাম খালি রাখা যাবে না",
-      });
       return;
     }
 
     try {
-      const existing = categories.find(cat => 
-        cat.name.toLowerCase() === newCategory.toLowerCase()
+      const existing = categories.find(
+        (cat) => cat.name.toLowerCase() === newCategory.toLowerCase()
       );
-      
+
       if (existing) {
-        Toast.show({
-          type: "error",
-          text1: `"${newCategory}" নামে ইতিমধ্যে একটি ক্যাটাগরি আছে`,
-        });
         return;
       }
 
       let updatedCategories;
       if (editCategory) {
         if (editCategory.is_default) {
-          Toast.show({
-            type: "error",
-            text1: "ডিফল্ট ক্যাটাগরি সম্পাদনা করা যাবে না",
-          });
           return;
         }
-        
-        updatedCategories = categories.map(cat => 
+
+        updatedCategories = categories.map((cat) =>
           cat.id === editCategory.id ? { ...cat, name: newCategory } : cat
         );
-        
-        Toast.show({
-          type: "success",
-          text1: "ক্যাটাগরি আপডেট করা হয়েছে",
-        });
+
       } else {
         const newCat = {
           id: Crypto.randomUUID(),
           name: newCategory,
           type: "expense",
-          is_default: false
+          is_default: false,
         };
-        
+
         updatedCategories = [...categories, newCat];
-        Toast.show({
-          type: "success",
-          text1: "নতুন ক্যাটাগরি যোগ করা হয়েছে",
-        });
+
       }
 
-      await FileSystem.writeAsStringAsync(CATEGORIES_FILE, JSON.stringify(updatedCategories));
-      
+      await FileSystem.writeAsStringAsync(
+        CATEGORIES_FILE,
+        JSON.stringify(updatedCategories)
+      );
+
       setCategories(updatedCategories);
       setModalVisible(false);
       setNewCategory("");
       setEditCategory(null);
     } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "ক্যাটাগরি সংরক্ষণ করতে ব্যর্থ হয়েছে",
-      });
+
       console.error("Save error:", error);
     }
   };
 
   const handleEdit = (cat) => {
     if (cat.is_default) {
-      Toast.show({
-        type: "error",
-        text1: "ডিফল্ট ক্যাটাগরি সম্পাদনা করা যাবে না",
-      });
       return;
     }
     setEditCategory(cat);
@@ -166,13 +177,9 @@ export default function Categories() {
 
   const handleDelete = (cat) => {
     if (cat.is_default) {
-      Toast.show({
-        type: "error",
-        text1: "ডিফল্ট ক্যাটাগরি ডিলিট করা যাবে না",
-      });
       return;
     }
-    
+
     // মডাল দেখানোর জন্য ক্যাটাগরি সেট করুন
     setCategoryToDelete(cat);
     setShowDeleteModal(true);
@@ -180,33 +187,27 @@ export default function Categories() {
 
   const confirmDelete = async () => {
     if (!categoryToDelete) return;
-    
+
     try {
-      const othersCategory = categories.find(cat => cat.name === "অন্যান্য খরচ");
+      const othersCategory = categories.find(
+        (cat) => cat.name === "অন্যান্য খরচ"
+      );
       if (!othersCategory) {
-        Toast.show({
-          type: "error",
-          text1: "'অন্যান্য খরচ' ক্যাটাগরি পাওয়া যায়নি",
-        });
         return;
       }
-      
-      const updatedCategories = categories.filter(cat => cat.id !== categoryToDelete.id);
-      await FileSystem.writeAsStringAsync(CATEGORIES_FILE, JSON.stringify(updatedCategories));
-      
+
+      const updatedCategories = categories.filter(
+        (cat) => cat.id !== categoryToDelete.id
+      );
+      await FileSystem.writeAsStringAsync(
+        CATEGORIES_FILE,
+        JSON.stringify(updatedCategories)
+      );
+
       setCategories(updatedCategories);
       setShowDeleteModal(false);
       setCategoryToDelete(null);
-      
-      Toast.show({
-        type: "success",
-        text1: "ক্যাটাগরি সফলভাবে ডিলিট করা হয়েছে",
-      });
     } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "ক্যাটাগরি ডিলিট করতে ব্যর্থ হয়েছে",
-      });
       console.error("Delete error:", error);
     }
   };
@@ -303,7 +304,8 @@ export default function Categories() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>ক্যাটাগরি ডিলিট করুন</Text>
             <Text style={styles.modalMessage}>
-              আপনি কি নিশ্চিত যে আপনি {categoryToDelete?.name} ক্যাটাগরি ডিলিট করতে চান?
+              আপনি কি নিশ্চিত যে আপনি {categoryToDelete?.name} ক্যাটাগরি ডিলিট
+              করতে চান?
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -349,7 +351,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     marginLeft: 8,
-    fontFamily: 'bangla_regular'
+    fontFamily: "bangla_regular",
   },
   categoryItem: {
     backgroundColor: "#fff",
@@ -368,7 +370,7 @@ const styles = StyleSheet.create({
   categoryName: {
     fontWeight: "500",
     color: "#1f2937",
-    fontFamily: 'bangla_medium'
+    fontFamily: "bangla_medium",
   },
   actions: {
     flexDirection: "row",
@@ -382,7 +384,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     color: "#777",
-    textAlign: 'center',
+    textAlign: "center",
   },
   fab: {
     position: "absolute",
@@ -423,13 +425,13 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontFamily: 'bangla_bold',
+    fontFamily: "bangla_bold",
     marginBottom: 10,
     textAlign: "center",
     color: "#333",
   },
   modalMessage: {
-    fontFamily: 'bangla_regular',
+    fontFamily: "bangla_regular",
     marginBottom: 20,
     textAlign: "center",
     color: "#555",
@@ -454,10 +456,10 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: "#333",
-    fontFamily: 'bangla_semibold',
+    fontFamily: "bangla_semibold",
   },
   deleteButtonText: {
     color: "#fff",
-    fontFamily: 'bangla_semibold',
+    fontFamily: "bangla_semibold",
   },
 });

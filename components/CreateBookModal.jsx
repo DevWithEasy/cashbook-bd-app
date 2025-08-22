@@ -13,10 +13,10 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import Toast from "react-native-toast-message";
 import { useStore } from "../utils/z-store";
 
-const BOOK_FILE = FileSystem.documentDirectory + 'books.json';
+const APP_DIR = FileSystem.documentDirectory;
+const BOOK_FILE = APP_DIR + 'books.json';
 
 export default function CreateBookModal({
   modalVisible,
@@ -29,11 +29,6 @@ export default function CreateBookModal({
 
   const createBook = async () => {
     if (!newBookName.trim()) {
-      Toast.show({
-        type: "error",
-        text1: "বইয়ের নাম লিখুন",
-        text2: "আপনি একটি বইয়ের নাম লিখতে ভুলে গেছেন",
-      });
       return;
     }
 
@@ -52,11 +47,6 @@ export default function CreateBookModal({
       );
 
       if (duplicate) {
-        Toast.show({
-          type: "error",
-          text1: "এই নামে একটি বই ইতিমধ্যে আছে",
-          text2: "অনুগ্রহ করে একটি ভিন্ন নাম চেষ্টা করুন",
-        });
         return;
       }
 
@@ -68,6 +58,8 @@ export default function CreateBookModal({
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
+      const NEW_BOOK_FILE = APP_DIR + `book_${newBook.id}.json`;
+      await FileSystem.writeAsStringAsync(NEW_BOOK_FILE, JSON.stringify([]));
 
       // Add new book to array
       const updatedBooks = [...allBooks, newBook];
@@ -81,19 +73,8 @@ export default function CreateBookModal({
 
       setModalVisible(false);
       setNewBookName("");
-
-      Toast.show({
-        type: "success",
-        text1: "✅ বই তৈরি সফল!",
-        text2: `${newBookName.trim()} সফলভাবে যোগ করা হয়েছে`,
-      });
     } catch (error) {
       console.error("বই তৈরি করতে ব্যর্থ:", error);
-      Toast.show({
-        type: "error",
-        text1: "⚠️ বই তৈরি ব্যর্থ",
-        text2: "দয়া করে আবার চেষ্টা করুন",
-      });
     } finally {
       setIsCreating(false);
     }

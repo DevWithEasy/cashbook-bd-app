@@ -1,22 +1,10 @@
 import { TouchableOpacity, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from '@expo/vector-icons';
-
-const getCategoryColor = (categoryName) => {
-  if (!categoryName) return "#e5e7eb";
-
-  let hash = 0;
-  for (let i = 0; i < categoryName.length; i++) {
-    hash = categoryName.charCodeAt(i) + ((hash << 5) - hash);
-  }
-
-  const hue = Math.abs(hash % 360);
-  return `hsl(${hue}, 70%, 90%)`;
-};
+import formatTimeToBengali from "../utils/formatTimeToBengali";
 
 export default function TransactionItem({ transaction, runningBalance }) {
   const router = useRouter();
-  const categoryColor = getCategoryColor(transaction.category);
 
   const handleTransactionPress = () => {
     router.push({
@@ -34,22 +22,14 @@ export default function TransactionItem({ transaction, runningBalance }) {
       <View style={styles.contentContainer}>
         {/* First Row - Category and Amount */}
         <View style={styles.firstRow}>
-          <View style={styles.categoryRow}>
-            <View
-              style={[
-                styles.categoryIndicator,
-                { backgroundColor: categoryColor },
-              ]}
-            />
-            <View style={styles.categoryTextContainer}>
-              <Text
+          <View style={styles.category}>
+            <Text
                 style={styles.categoryText}
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
                 {transaction.category || "বিভাগহীন"}
               </Text>
-            </View>
           </View>
           
           <Text
@@ -73,7 +53,7 @@ export default function TransactionItem({ transaction, runningBalance }) {
         {/* Third Row - Date, Time and Balance */}
         <View style={styles.bottomRow}>
           <Text style={styles.dateText}>
-            <Ionicons name="calendar-outline" size={12} color="#9ca3af" /> {new Date(transaction.date).toLocaleDateString('bn-BD')} • <Ionicons name="time-outline" size={12} color="#9ca3af" /> {transaction.time}
+            <Ionicons name="calendar-outline" size={12} color="#9ca3af" /> {new Date(transaction.date).toLocaleDateString('bn-BD')} • <Ionicons name="time-outline" size={12} color="#9ca3af" /> {formatTimeToBengali(transaction.time)}
           </Text>
           
           <Text style={styles.balanceText}>
@@ -108,25 +88,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+  category: {
     marginRight: 10,
-  },
-  categoryIndicator: {
-    width: 4,
-    height: 20,
-    borderRadius: 2,
-    marginRight: 8,
-  },
-  categoryTextContainer: {
-    flex: 1,
+    backgroundColor: "#3b83f625",
+    paddingHorizontal: 6,
+    borderRadius: 4,
   },
   categoryText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily : 'bangla_semibold',
-    color: "#1f2937",
+    color: "#3b82f6",
   },
   incomeText: {
     fontSize: 16,
@@ -154,6 +125,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#9ca3af",
     flex: 1,
+    alignContent: 'center',
     fontFamily : 'bangla_regular',
   },
   balanceText: {

@@ -64,7 +64,7 @@ export default function BookItem({ book }) {
           {book?.name}
         </Text>
         <Text style={styles.updatedText}>
-          সর্বশেষ আপডেট: {book?.updated_at?.split("T")[0].toLocaleString('bn-BD') || "N/A"}
+          সর্বশেষ আপডেট: {new Date(book?.updated_at).toLocaleDateString('bn-BD')|| "N/A"}
         </Text>
       </View>
 
@@ -128,10 +128,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   balanceText: {
-    fontWeight: "600",
     minWidth: 80,
     textAlign: "right",
-    fontFamily: "bangla_bold",
+    fontFamily: "bangla_semibold",
     fontSize: 14,
   },
 });

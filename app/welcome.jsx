@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system";
 import { router } from "expo-router";
@@ -9,12 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Toast from "react-native-toast-message";
-
-const BUSINESS_FILE = FileSystem.documentDirectory + "business.json";
-const BOOK_FILE = FileSystem.documentDirectory + "books.json";
-const CATEGORIES_FILE = FileSystem.documentDirectory + "categories.json";
-const APP_SETTINGS_FILE = FileSystem.documentDirectory + "settings.json";
+const APP_DIR = FileSystem.documentDirectory;
+const BUSINESS_FILE = APP_DIR + "business.json";
+const BOOK_FILE = APP_DIR + "books.json";
+const CATEGORIES_FILE = APP_DIR + "categories.json";
+const APP_SETTINGS_FILE = APP_DIR + "settings.json";
 
 export default function WellCome() {
   const [loading, setLoading] = useState(false);
@@ -54,29 +54,40 @@ export default function WellCome() {
         { id: Crypto.randomUUID(), name: "অন্যান্য", type: "expense", is_default: true }
       ];
 
+      //create business data file
       await FileSystem.writeAsStringAsync(
         BUSINESS_FILE,
         JSON.stringify(businesses)
       );
+      //create book data file
       await FileSystem.writeAsStringAsync(BOOK_FILE, JSON.stringify(books));
+
+      //create default empty transaction file for the first book
+      const NEW_BOOK_FILE = APP_DIR + `book_${books[0].id}.json`;
+      await FileSystem.writeAsStringAsync(NEW_BOOK_FILE, JSON.stringify([]));
+
+      //create default categories file
       await FileSystem.writeAsStringAsync(
         CATEGORIES_FILE,
         JSON.stringify(categories)
       );
+
+      //create default app settings file
       await FileSystem.writeAsStringAsync(
         APP_SETTINGS_FILE,
         JSON.stringify({
+          name : '',
+          mobile : '',
+          email : '',
           selected_business: businesses[0].id,
         })
       );
+      // Mark app as initialized
+      await AsyncStorage.setItem('app_init','true')
 
       router.replace("/main");
     } catch (error) {
       console.error("ডাটাবেস ইনিশিয়ালাইজ করার সময় ত্রুটি:", error);
-      Toast.show({
-        type: "error",
-        text1: "ডাটাবেস শুরু করতে ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
-      });
     } finally {
       setLoading(false);
     }
@@ -133,8 +144,14 @@ export default function WellCome() {
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.buttonText}>শুরু করুন</Text>
+          <Text style={styles.buttonText}>নতুন করে শুরু করুন</Text>
         )}
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.restoreButton}
+        onPress={() => router.push("/settings/restore")}
+      >
+        <Text style={styles.buttonText}>রিস্টোর করুন</Text>
       </TouchableOpacity>
     </View>
   );
@@ -155,7 +172,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontFamily: "bangla_bold",
-    color: "#2c3e50",
+    color: "#3b82f6",
     marginBottom: 10,
     textAlign: "center",
   },
@@ -177,13 +194,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   featureIcon: {
-    fontSize: 20,
+    fontSize: 16,
     marginRight: 15,
     width: 40,
     textAlign: "center",
   },
   featureText: {
-    fontSize: 15,
     color: "#34495e",
     fontFamily: "bangla_medium",
     flex: 1,
@@ -192,17 +208,28 @@ const styles = StyleSheet.create({
     backgroundColor: "#3b82f6",
     padding: 16,
     borderRadius: 12,
+    marginBottom: 10,
     alignItems: "center",
-    marginBottom: 30,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
+  },
+    restoreButton: {
+    backgroundColor: "#dc2626",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   buttonText: {
     color: "white",
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: "bangla_semibold",
   },
 });

@@ -1,48 +1,35 @@
-import { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  StyleSheet,
-  Alert,
-  Image,
-  FlatList,
-  ScrollView,
-  Dimensions,
-} from "react-native";
-import { categories, types } from "../assets/images/bussiness/business_data";
+import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import Toast from "react-native-toast-message";
-import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useState } from "react";
+import {
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { categories, types } from "../../assets/images/bussiness/business_data";
 
 const BUSINESS_FILE = FileSystem.documentDirectory + "business.json";
+const BOOK_FILE = FileSystem.documentDirectory + "books.json";
+const APP_SETTINGS_FILE = FileSystem.documentDirectory + "settings.json";
+
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 60) / 2; 
 
-export default function UpdateBusiness() {
-  const router = useRouter();
-  const params = useLocalSearchParams();
-  const business = params.business ? JSON.parse(params.business) : null;
-
-  const [businessName, setBusinessName] = useState(business?.name || "");
-  const [selectedCategory, setSelectedCategory] = useState(
-    categories.find(cat => cat.name === business?.category) || null
-  );
-  const [selectedType, setSelectedType] = useState(
-    types.find(type => type.name === business?.type) || null
-  );
+export default function CreateBusiness() {
+  const [businessName, setBusinessName] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedType, setSelectedType] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!business) {
-      Alert.alert("ত্রুটি", "ব্যবসা ডেটা পাওয়া যায়নি");
-      router.back();
-    }
-  }, [business]);
-
-  const handleUpdateBusiness = async () => {
+  const handleCreateBusiness = async () => {
     if (!businessName.trim()) {
       Alert.alert("ত্রুটি", "ব্যবসার নাম লিখুন");
       return;
@@ -61,33 +48,69 @@ export default function UpdateBusiness() {
     setLoading(true);
 
     try {
+      // Create new business
+      const newBusiness = {
+        id: Crypto.randomUUID(),
+        name: businessName.trim(),
+        category: selectedCategory.name,
+        type: selectedType.name,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
       // Read existing businesses
-      const businessContent = await FileSystem.readAsStringAsync(BUSINESS_FILE);
-      let businesses = JSON.parse(businessContent);
+      let businesses = [];
+      try {
+        const businessesData = await FileSystem.readAsStringAsync(BUSINESS_FILE);
+        businesses = JSON.parse(businessesData);
+      } catch (error) {
+        // File doesn't exist, create new array
+        businesses = [];
+      }
 
-      // Update the business
-      businesses = businesses.map(b => 
-        b.id === business.id ? {
-          ...b,
-          name: businessName.trim(),
-          category: selectedCategory.name,
-          type: selectedType.name,
-          updated_at: new Date().toISOString()
-        } : b
-      );
+      // Add new business
+      businesses.push(newBusiness);
 
-      // Save updated businesses
+      // Save businesses
       await FileSystem.writeAsStringAsync(BUSINESS_FILE, JSON.stringify(businesses));
 
-      Toast.show({
-        type: "success",
-        text1: "ব্যবসা সফলভাবে আপডেট হয়েছে!",
-      });
+      // Create default book for this business
+      const defaultBook = {
+        id: Crypto.randomUUID(),
+        business_id: newBusiness.id,
+        name: "ডিফল্ট বই",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-      router.back();
+      // Read existing books
+      let books = [];
+      try {
+        const booksData = await FileSystem.readAsStringAsync(BOOK_FILE);
+        books = JSON.parse(booksData);
+      } catch (error) {
+        // File doesn't exist, create new array
+        books = [];
+      }
+
+      // Add default book
+      books.push(defaultBook);
+
+      // Save books
+      await FileSystem.writeAsStringAsync(BOOK_FILE, JSON.stringify(books));
+
+      // Update app settings with selected business
+      await FileSystem.writeAsStringAsync(
+        APP_SETTINGS_FILE,
+        JSON.stringify({
+          selected_business: newBusiness.id,
+        })
+      );
+      // Navigate to main screen
+      router.replace("/main");
     } catch (error) {
-      console.error("ব্যবসা আপডেট করতে ব্যর্থ:", error);
-      Alert.alert("ত্রুটি", "ব্যবসা আপডেট করতে ব্যর্থ হয়েছে");
+      console.error("ব্যবসা তৈরি করতে ব্যর্থ:", error);
+      Alert.alert("ত্রুটি", "ব্যবসা তৈরি করতে ব্যর্থ হয়েছে");
     } finally {
       setLoading(false);
     }
@@ -126,14 +149,6 @@ export default function UpdateBusiness() {
       <Text style={styles.categoryText}>{item.name}</Text>
     </TouchableOpacity>
   );
-
-  if (!business) {
-    return (
-      <View style={styles.container}>
-        <Text>লোড হচ্ছে...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -177,18 +192,18 @@ export default function UpdateBusiness() {
         <View style={styles.spacer} />
       </ScrollView>
 
-      {/* Fixed Update Button */}
+      {/* Fixed Create Button */}
       <View style={styles.fixedButtonContainer}>
         <TouchableOpacity
           style={[
-            styles.updateButton,
+            styles.createButton,
             (!businessName.trim() || !selectedCategory || !selectedType) && styles.disabledButton,
           ]}
-          onPress={handleUpdateBusiness}
+          onPress={handleCreateBusiness}
           disabled={!businessName.trim() || !selectedCategory || !selectedType || loading}
         >
-          <Text style={styles.updateButtonText}>
-            {loading ? "আপডেট হচ্ছে..." : "আপডেট করুন"}
+          <Text style={styles.createButtonText}>
+            {loading ? "তৈরি হচ্ছে..." : "ব্যবসা তৈরি করুন"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -201,19 +216,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'bangla_bold',
-    color: '#2c3e50',
-  },
   scrollView: {
     flex: 1,
   },
@@ -225,6 +227,7 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
   label: {
+    fontSize: 16,
     fontFamily: "bangla_bold",
     marginBottom: 8,
     color: "#333",
@@ -294,7 +297,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#ddd',
   },
-  updateButton: {
+  createButton: {
     backgroundColor: "#3b82f6",
     padding: 16,
     borderRadius: 12,
@@ -303,9 +306,8 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: "#ccc",
   },
-  updateButtonText: {
+  createButtonText: {
     color: "white",
-    fontSize: 16,
-    fontFamily: "bangla_semibold",
+    fontFamily: "bangla_bold",
   },
 });

@@ -1,32 +1,65 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as FileSystem from 'expo-file-system';
+import { Asset } from "expo-asset";
+import * as FileSystem from "expo-file-system";
 import * as Print from "expo-print";
 import { useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { useStore } from "../utils/z-store";
 
-const BOOKS_FILE = FileSystem.documentDirectory + 'books.json';
-const TRANSACTIONS_FILE = (bookId) => FileSystem.documentDirectory + `book_${bookId}.json`;
+const BOOKS_FILE = FileSystem.documentDirectory + "books.json";
+const TRANSACTIONS_FILE = (bookId) =>
+  FileSystem.documentDirectory + `book_${bookId}.json`;
 
 export default function BookMenu({
   id,
   book,
   transactions,
+  searchQuery,
   setMenuVisible,
   setEditModalVisible,
+  setIsGeneratingPdf
 }) {
   const router = useRouter();
-  const { books, addBooks, addTransactions } = useStore();
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { addBooks, addTransactions } = useStore();
+
+  // এখানে static require ব্যবহার করতে হবে
+  const fonts = {
+    bangla_light: require("../assets/fonts/bangla_light.ttf"),
+    bangla_regular: require("../assets/fonts/bangla_regular.ttf"),
+    bangla_medium: require("../assets/fonts/bangla_medium.ttf"),
+    bangla_semibold: require("../assets/fonts/bangla_semiBold.ttf"),
+    bangla_bold: require("../assets/fonts/bangla_bold.ttf"),
+  };
+
+  const [base64Fonts, setBase64Fonts] = useState({});
+
+  useEffect(() => {
+    const loadFonts = async () => {
+      const results = {};
+
+      for (const [key, assetModule] of Object.entries(fonts)) {
+        const asset = Asset.fromModule(assetModule);
+        await asset.downloadAsync();
+        const fontData = await FileSystem.readAsStringAsync(asset.localUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        results[key] = fontData;
+      }
+
+      setBase64Fonts(results);
+    };
+
+    loadFonts();
+  }, []);
 
   const handleEditBook = () => {
     setMenuVisible(false);
@@ -54,14 +87,17 @@ export default function BookMenu({
       // Delete transactions file
       const transactionsPath = TRANSACTIONS_FILE(id);
       await FileSystem.deleteAsync(transactionsPath);
-      
+
       // Update books list
       const booksContent = await FileSystem.readAsStringAsync(BOOKS_FILE);
       const allBooks = JSON.parse(booksContent);
-      const updatedBooks = allBooks.filter(b => b.id !== id);
-      
-      await FileSystem.writeAsStringAsync(BOOKS_FILE, JSON.stringify(updatedBooks));
-      
+      const updatedBooks = allBooks.filter((b) => b.id !== id);
+
+      await FileSystem.writeAsStringAsync(
+        BOOKS_FILE,
+        JSON.stringify(updatedBooks)
+      );
+
       // Update store
       addBooks(updatedBooks);
       addTransactions([]);
@@ -71,52 +107,57 @@ export default function BookMenu({
     }
   };
 
-  const handlePdf = async () => {
-    setMenuVisible(false);
-    setIsGenerating(true);
+const handlePdf = async () => {
+  setMenuVisible(false);
+  setIsGeneratingPdf(true);
 
-    try {
-      const html = generatePdfHtml(book, transactions);
-
-      // Custom filename: bookName@cashbookbd-YYYY-MM-DD.pdf
-      const today = new Date();
-      const yyyyMMdd = today.toISOString().split("T")[0];
-      const fileName = `${book.name.replace(
-        /[^a-zA-Z0-9]/g,
-        "_"
-      )}@cashbookbd-${yyyyMMdd}.pdf`;
-
-      const { uri } = await Print.printToFileAsync({
-        html,
-        base64: false,
-        fileName,
-      });
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          dialogTitle: `${book.name} লেনদেনের ইতিহাস`,
-          mimeType: "application/pdf",
-        });
-      } else {
-        Alert.alert(
-          "শেয়ারিং অসমর্থিত",
-          "আপনার ডিভাইসে শেয়ারিং সাপোর্ট করে না"
-        );
-      }
-    } catch (error) {
-      console.error("PDF জেনারেট করতে ব্যর্থ:", error);
-    } finally {
-      setIsGenerating(false);
+  try {
+    if (Object.keys(base64Fonts).length === 0) {
+      Alert.alert("ত্রুটি", "ফন্ট লোড হয়নি, আবার চেষ্টা করুন।");
+      return;
     }
-  };
 
-  const generatePdfHtml = (book, transactions) => {
+    const html = generatePdfHtml(book, transactions, searchQuery);
+
+    // Custom filename: bookName@cashbookbd-YYYY-MM-DD.pdf
+    const today = new Date();
+    const yyyyMMdd = today.toISOString().split("T")[0];
+    const fileName = `${book.name.replace(
+      /[^a-zA-Z0-9]/g,
+      "_"
+    )}@cashbookbd-${yyyyMMdd}.pdf`;
+
+    const { uri } = await Print.printToFileAsync({
+      html,
+      base64: false,
+      fileName,
+    });
+
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri, {
+        dialogTitle: `${book.name} লেনদেনের ইতিহাস`,
+        mimeType: "application/pdf",
+      });
+    } else {
+      Alert.alert(
+        "শেয়ারিং অসমর্থিত",
+        "আপনার ডিভাইসে শেয়ারিং সাপোর্ট করে না"
+      );
+    }
+  } catch (error) {
+    console.error("PDF জেনারেট করতে ব্যর্থ:", error);
+  } finally {
+    setIsGeneratingPdf(false);
+  }
+};
+
+  const generatePdfHtml = (book, transactions, searchQuery) => {
     const totalIncome = transactions.reduce(
-      (sum, t) => (t.type === 'income' ? sum + t.amount : sum),
+      (sum, t) => (t.type === "income" ? sum + t.amount : sum),
       0
     );
     const totalExpense = transactions.reduce(
-      (sum, t) => (t.type === 'expense' ? sum + t.amount : sum),
+      (sum, t) => (t.type === "expense" ? sum + t.amount : sum),
       0
     );
     const balance = totalIncome - totalExpense;
@@ -125,14 +166,16 @@ export default function BookMenu({
       .map(
         (t) => `
       <tr>
-        <td>${new Date(t.date).toLocaleDateString()}</td>
+        <td>${new Date(t.date).toLocaleDateString("bn-BD")}</td>
         <td>${t.category || "-"}</td>
         <td>${t.remark || "-"}</td>
-        <td style="text-align: right;" class="${t.type === 'income' ? 'positive' : 'negative'}">
-          ${t.amount.toLocaleString()}
+        <td style="text-align: right;" class="${
+          t.type === "income" ? "positive" : "negative"
+        }">
+          ${t.amount.toLocaleString("bn-BD")}
         </td>
         <td style="text-align: right;">
-          ${t.runningBalance?.toLocaleString() || "0"}
+          ${t.runningBalance?.toLocaleString("bn-BD") || "0"}
         </td>
       </tr>
     `
@@ -146,22 +189,39 @@ export default function BookMenu({
         <meta charset="utf-8">
         <title>${book.name} লেনদেন</title>
         <style>
-          body { font-family: Arial; font-size: 12px; padding: 20px 30px; }
+          @font-face {
+            font-family: 'Bangla';
+            src: url(data:font/truetype;base64,${
+              base64Fonts.bangla_regular
+            }) format('truetype');
+            font-weight: 400;
+          }
+          @font-face {
+            font-family: 'Bangla';
+            src: url(data:font/truetype;base64,${
+              base64Fonts.bangla_bold
+            }) format('truetype');
+            font-weight: 700;
+          }
+          
+          body { font-family: 'Bangla', Arial, sans-serif; font-size: 12px; padding: 20px 30px; }
           .header { text-align: center; margin-bottom: 20px; }
-          .app-name { font-size: 24px; font-weight: bold; color: #2c3e50; margin-bottom: 5px; }
+          .app-name { font-size: 24px; font-weight: bold; color: #3b82f6; margin-bottom: 5px; }
           .app-slogan { font-size: 14px; color: #7f8c8d; margin-bottom: 15px; }
-          .report-title { color: #333; text-align: center; font-size: 18px; margin: 15px 0; }
+          .report-title { color: #333; text-align: center; font-size: 15px; margin: 15px 0; font-weight: 600; }
+          .search-info { text-align: center; color: #666; margin-bottom: 15px; font-style: italic; background-color: #f9f9f9; padding: 8px; border-radius: 4px; }
           .generated-date { text-align: center; color: #666; margin-bottom: 15px; }
           table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th { background-color: #f2f2f2; text-align: left; padding: 10px; border: 1px solid #ddd; }
+          th { background-color: #f2f2f2; text-align: left; padding: 10px; border: 1px solid #ddd; font-weight: 600; }
           td { padding: 8px 10px; border: 1px solid #ddd; }
           .summary-container { display: flex; justify-content: space-between; margin: 25px 0; }
           .summary-box { flex: 1; padding: 12px; margin: 0 5px; border-radius: 5px; background-color: #f8f9fa; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
           .summary-title { font-size: 13px; color: #7f8c8d; margin-bottom: 5px; }
           .summary-value { font-size: 16px; font-weight: bold; }
-          .footer { margin-top: 30px; font-size: 10px; text-align: center; color: #666; }
-          .positive { color: #27ae60; }
-          .negative { color: #e74c3c; }
+          .footer { margin-top: 30px; font-size: 10px; text-align: center; color: #666; padding: 15px; }
+          .contact-info { margin-top: 10px; font-size: 11px; }
+          .positive { color: #27ae60; font-weight: 500; }
+          .negative { color: #e74c3c; font-weight: 500; }
         </style>
       </head>
       <body>
@@ -171,40 +231,45 @@ export default function BookMenu({
         </div>
         
         <div class="report-title">${book.name} লেনদেন রিপোর্ট</div>
-        <div class="generated-date">তৈরির তারিখ: ${new Date().toLocaleString()}</div>
+        
+        ${
+          searchQuery
+            ? `<div class="search-info">সার্চ ফলাফল: "${searchQuery}" - ${transactions.length}টি লেনদেন পাওয়া গেছে</div>`
+            : ""
+        }
+        
+        <div class="generated-date">তৈরির তারিখ: ${new Date().toLocaleString(
+          "bn-BD"
+        )}</div>
         
         <div class="summary-container">
-          <div class="summary-box">
-            <div class="summary-title">মোট আয়</div>
-            <div class="summary-value positive">${totalIncome.toLocaleString()}</div>
-          </div>
-          <div class="summary-box">
-            <div class="summary-title">মোট খরচ</div>
-            <div class="summary-value negative">${totalExpense.toLocaleString()}</div>
-          </div>
-          <div class="summary-box">
-            <div class="summary-title">বর্তমান ব্যালেন্স</div>
-            <div class="summary-value">${balance.toLocaleString()}</div>
-          </div>
+          <div class="summary-box"><div class="summary-title">মোট আয়</div><div class="summary-value positive">${totalIncome.toLocaleString(
+            "bn-BD"
+          )} ৳</div></div>
+          <div class="summary-box"><div class="summary-title">মোট খরচ</div><div class="summary-value negative">${totalExpense.toLocaleString(
+            "bn-BD"
+          )} ৳</div></div>
+          <div class="summary-box"><div class="summary-title">বর্তমান ব্যালেন্স</div><div class="summary-value">${balance.toLocaleString(
+            "bn-BD"
+          )} ৳</div></div>
         </div>
 
         <table>
           <thead>
-            <tr>
-              <th>তারিখ</th>
-              <th>বিভাগ</th>
-              <th>মন্তব্য</th>
-              <th>পরিমাণ</th>
-              <th>ব্যালেন্স</th>
-            </tr>
+          <tr>
+          <th>তারিখ</th>
+          <th>বিভাগ</th>
+          <th>মন্তব্য</th>
+          <th>পরিমাণ</th>
+          <th>ব্যালেন্স</th>
+          </tr>
           </thead>
-          <tbody>
-            ${transactionRows}
-          </tbody>
+          <tbody>${transactionRows}</tbody>
         </table>
         
         <div class="footer">
           <p>ক্যাশবুক BD অ্যাপ দ্বারা তৈরি</p>
+          <div class="contact-info">ইমেইল: robiulawal68@gmail.com | ফোন: +8801717642515</div>
         </div>
       </body>
       </html>
@@ -213,24 +278,17 @@ export default function BookMenu({
 
   return (
     <View style={styles.menuContainer}>
-      {isGenerating && (
-        <View style={styles.loaderOverlay}>
-          <ActivityIndicator size="large" color="#007aff" />
-          <Text style={{ marginTop: 8, color: "#333" }}>PDF তৈরি হচ্ছে...</Text>
-        </View>
-      )}
 
       <TouchableOpacity style={styles.menuItem} onPress={handleEditBook}>
         <View style={styles.menuItemContent}>
           <Ionicons name="create-outline" size={16} style={styles.menuIcon} />
-          <Text>বই সম্পাদনা</Text>
+          <Text style={styles.labelText}>বই সম্পাদনা</Text>
         </View>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.menuItem}
         onPress={handlePdf}
-        disabled={isGenerating}
       >
         <View style={styles.menuItemContent}>
           <Ionicons
@@ -238,7 +296,7 @@ export default function BookMenu({
             size={16}
             style={styles.menuIcon}
           />
-          <Text>PDF তৈরি করুন</Text>
+          <Text style={styles.labelText}>PDF তৈরি করুন</Text>
         </View>
       </TouchableOpacity>
 
@@ -272,25 +330,16 @@ const styles = StyleSheet.create({
     zIndex: 1,
     width: 170,
   },
-  menuItem: {
-    paddingVertical: 8,
-    width: "100%",
-  },
+  menuItem: { paddingVertical: 8, width: "100%" },
   menuItemContent: {
     flexDirection: "row",
     alignItems: "center",
     width: "100%",
   },
-  menuIcon: {
-    marginRight: 8,
-    color: "#333",
-  },
-  deleteIcon: {
-    color: "red",
-  },
-  deleteText: {
-    color: "red",
-  },
+  menuIcon: { marginRight: 8, color: "#333" },
+  deleteIcon: { color: "red" },
+  labelText: { color: "#333", fontFamily: "bangla_semibold" },
+  deleteText: { color: "red", fontFamily: "bangla_semibold" },
   loaderOverlay: {
     position: "absolute",
     top: "30%",

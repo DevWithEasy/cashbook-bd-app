@@ -10,11 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Toast from "react-native-toast-message";
 import { useStore } from "../utils/z-store";
 
 const TRANSACTIONS_FILE = (bookId) => FileSystem.documentDirectory + `book_${bookId}.json`;
-const BOOKS_FILE = FileSystem.documentDirectory + 'books.json';
 
 export default function TransactionTransferModal({
   showTransferModal,
@@ -31,11 +29,6 @@ export default function TransactionTransferModal({
 
   const handleTransfer = async () => {
     if (!selectedBook) {
-      Toast.show({
-        type: "error",
-        text1: "একটি বই নির্বাচন করুন",
-        text2: "লেনদেন স্থানান্তর করতে একটি বই নির্বাচন করুন"
-      });
       return;
     }
 
@@ -68,21 +61,10 @@ export default function TransactionTransferModal({
       
       // Update state
       addTransactions(sourceTransactions);
-      
-      Toast.show({
-        type: "success",
-        text1: "লেনদেন সফলভাবে স্থানান্তরিত হয়েছে",
-        text2: `${transferTransaction.amount} টাকা স্থানান্তর করা হয়েছে`
-      });
-
+    
       setShowTransferModal(false);
       router.back();
     } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "লেনদেন স্থানান্তর করতে ব্যর্থ হয়েছে",
-        text2: "দয়া করে আবার চেষ্টা করুন"
-      });
       console.error(error);
     } finally {
       setLoading(false);
@@ -187,12 +169,14 @@ const styles = StyleSheet.create({
     color: "#1f2937",
     marginBottom: 12,
     textAlign: "center",
+    fontFamily: "bangla_bold",
   },
   subtitle: {
     color: "#4b5563",
     marginBottom: 16,
     textAlign: "center",
     lineHeight: 22,
+    fontFamily: "bangla_medium",
   },
   highlight: {
     fontWeight: "600",
@@ -233,12 +217,10 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: "#374151",
-    fontWeight: "600",
-    fontSize: 16,
+    fontFamily: "bangla_bold",
   },
   transferText: {
     color: "#fff",
-    fontWeight: "600",
-    fontSize: 16,
+    fontFamily: "bangla_bold",
   },
 });

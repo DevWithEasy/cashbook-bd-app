@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router/tabs";
-import { StyleSheet, Text, TouchableOpacity, View, Modal } from "react-native";
-import { useState, useEffect } from "react";
 import * as FileSystem from "expo-file-system";
 import { useRouter } from "expo-router";
+import { Tabs } from "expo-router/tabs";
+import { useEffect, useState } from "react";
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useStore } from "../../utils/z-store";
 
 const BUSINESS_FILE = FileSystem.documentDirectory + "business.json";
 const SETTINGS_FILE = FileSystem.documentDirectory + "settings.json";
@@ -12,14 +13,12 @@ const SETTINGS_FILE = FileSystem.documentDirectory + "settings.json";
 const CustomHeader = ({ onBusinessChange }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [businesses, setBusinesses] = useState([]);
-  const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter()
-
-  // Load businesses and selected business
+  const {selectedBusiness,addselectedBusiness} = useStore()
   useEffect(() => {
     loadBusinessData();
-  }, []);
+  }, [selectedBusiness]);
 
   const loadBusinessData = async () => {
     try {
@@ -34,7 +33,7 @@ const CustomHeader = ({ onBusinessChange }) => {
       const selected = businessData.find(
         (b) => b.id === settingsData.selected_business
       );
-      setSelectedBusiness(selected);
+      addselectedBusiness(selected);
     } catch (error) {
       console.error("Business data load error:", error);
     } finally {
@@ -57,7 +56,7 @@ const CustomHeader = ({ onBusinessChange }) => {
         SETTINGS_FILE,
         JSON.stringify(updatedSettings)
       );
-      setSelectedBusiness(business);
+      addselectedBusiness(business);
       setModalVisible(false);
 
       // Call the callback function to refresh home screen
@@ -71,7 +70,7 @@ const CustomHeader = ({ onBusinessChange }) => {
 
   const handleAddBusiness = () => {
     setModalVisible(false);
-    router.push('/create-business')
+    router.push('/business/create-business')
   };
 
   if (loading) {
@@ -188,7 +187,7 @@ export default function MainLayout() {
 
   return (
     <Tabs
-      key={refreshKey} // This will force re-render when business changes
+      key={refreshKey}
       screenOptions={{
         headerTitleAlign: "center",
         tabBarActiveTintColor: "#007AFF",

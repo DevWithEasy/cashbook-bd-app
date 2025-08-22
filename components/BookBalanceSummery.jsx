@@ -66,9 +66,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
   },
-  marginBottom: {
-    marginBottom: 8,
-  },
   summaryLabel: {
     color: "#4b5563",
     fontFamily : 'bangla_semibold'

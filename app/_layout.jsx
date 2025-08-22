@@ -24,9 +24,7 @@ export default function RootLayout() {
   }, []);
 
   if (!fontsLoaded || !isSplashReady) {
-    return (
-      <SplashContainer/>
-    );
+    return <SplashContainer />;
   }
 
   if (fontError) {
@@ -40,21 +38,18 @@ export default function RootLayout() {
 
   return (
     <>
-      <Stack>
+      <Stack
+        screenOptions={{
+          headerTitleStyle: {
+            fontFamily: "bangla_bold",
+          },
+        }}
+      >
         <Stack.Screen
           name="index"
           options={{
             title: "স্বাগতম",
             headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="create-pin"
-          options={{
-            title: "পিন তৈরি করুন",
-            headerBackTitle: "পিছনে",
-            headerBackTitleVisible: true,
-            headerShown: false
           }}
         />
         <Stack.Screen
@@ -65,23 +60,16 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
-          name="login"
+          name="main"
           options={{
-            title: "লগইন",
             headerShown: false,
           }}
         />
         <Stack.Screen
-          name="recover-pin"
+          name="book/[id]"
           options={{
-            title: "পিন পুনরুদ্ধার",
+            title: "বইয়ের বিস্তারিত",
             headerBackTitle: "পিছনে",
-          }}
-        />
-        <Stack.Screen
-          name="main"
-          options={{
-            headerShown: false
           }}
         />
         <Stack.Screen
@@ -99,23 +87,51 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
-          name="categories"
+          name="business/create-business"
           options={{
-            title: "ক্যাটাগরি সমূহ",
+            title: "নতুন ব্যবসা খুলুন",
             headerBackTitle: "পিছনে",
           }}
         />
         <Stack.Screen
-          name="about"
+          name="business/update-business"
           options={{
-            title: "অ্যাপ সম্পর্কে",
+            title: "ব্যবসা আপডেট",
             headerBackTitle: "পিছনে",
           }}
         />
         <Stack.Screen
-          name="privacy"
+          name="settings/profile"
+          options={{
+            title: "প্রোফাইল",
+            headerBackTitle: "পিছনে",
+          }}
+        />
+        <Stack.Screen
+          name="settings/backup"
+          options={{
+            title: "ডাটা ব্যাকআপ নিন",
+            headerBackTitle: "পিছনে",
+          }}
+        />
+        <Stack.Screen
+          name="settings/restore"
+          options={{
+            title: "ডাটা রিস্টোর করুন",
+            headerBackTitle: "পিছনে",
+          }}
+        />
+        <Stack.Screen
+          name="settings/privacy"
           options={{
             title: "গোপনীয়তা নীতি",
+            headerBackTitle: "পিছনে",
+          }}
+        />
+        <Stack.Screen
+          name="settings/about"
+          options={{
+            title: "অ্যাপ সম্পর্কে",
             headerBackTitle: "পিছনে",
           }}
         />
@@ -127,41 +143,41 @@ export default function RootLayout() {
 const styles = {
   splashContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#3b82f6',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#3b82f6",
   },
   splashText: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: "bold",
+    color: "white",
     marginTop: 20,
-    fontFamily: 'bangla_bold',
+    fontFamily: "bangla_bold",
   },
   splashSubtext: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: "rgba(255, 255, 255, 0.8)",
     marginTop: 8,
-    fontFamily: 'bangla_regular',
+    fontFamily: "bangla_regular",
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f8f9fa",
     padding: 20,
   },
   errorText: {
     fontSize: 20,
-    color: '#ef4444',
-    textAlign: 'center',
+    color: "#ef4444",
+    textAlign: "center",
     marginBottom: 10,
-    fontFamily: 'bangla_medium',
+    fontFamily: "bangla_medium",
   },
   errorSubtext: {
     fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    fontFamily: 'bangla_regular',
+    color: "#6b7280",
+    textAlign: "center",
+    fontFamily: "bangla_regular",
   },
 };

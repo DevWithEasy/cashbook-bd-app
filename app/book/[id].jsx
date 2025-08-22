@@ -1,17 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from "expo-file-system";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from "react-native";
-import Toast from "react-native-toast-message";
 import BookBalanceSummery from "../../components/BookBalanceSummery";
 import BookMenu from "../../components/BookMenu";
 import BookUpdateModal from "../../components/BookUpdateModal";
@@ -19,19 +19,15 @@ import TransactionButton from "../../components/TransactionButton";
 import TransactionItem from "../../components/TransactionItem";
 import { useStore } from "../../utils/z-store";
 
-const TRANSACTIONS_FILE = (bookId) => FileSystem.documentDirectory + `book_${bookId}.json`;
+const TRANSACTIONS_FILE = (bookId) =>
+  FileSystem.documentDirectory + `book_${bookId}.json`;
 
 export default function BookDetails() {
   const params = useLocalSearchParams();
   const book = params.book ? JSON.parse(params.book) : null;
   const id = params.id;
 
-  const {
-    books,
-    addBooks,
-    transactions,
-    addTransactions,
-  } = useStore();
+  const { books, addBooks, transactions, addTransactions } = useStore();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -39,6 +35,7 @@ export default function BookDetails() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [newBookName, setNewBookName] = useState(book?.name || "");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Load transactions from JSON file
   useEffect(() => {
@@ -53,7 +50,6 @@ export default function BookDetails() {
           const loadedTransactions = JSON.parse(fileContent);
           addTransactions(loadedTransactions);
         } else {
-          // Create new empty transactions file if doesn't exist
           await FileSystem.writeAsStringAsync(filePath, JSON.stringify([]));
           addTransactions([]);
         }
@@ -74,9 +70,10 @@ export default function BookDetails() {
       .slice()
       .reverse()
       .map((transaction) => {
-        balance = transaction.type === 'income' 
-          ? balance + transaction.amount 
-          : balance - transaction.amount;
+        balance =
+          transaction.type === "income"
+            ? balance + transaction.amount
+            : balance - transaction.amount;
         return { ...transaction, runningBalance: balance };
       })
       .reverse();
@@ -97,38 +94,30 @@ export default function BookDetails() {
 
   const updateBookName = async () => {
     if (!newBookName.trim()) {
-      Toast.show({
-        type: "error",
-        text1: "Book name cannot be empty",
-      });
       return;
     }
 
     try {
       // Update in books.json
-      const booksPath = FileSystem.documentDirectory + 'books.json';
+      const booksPath = FileSystem.documentDirectory + "books.json";
       const booksContent = await FileSystem.readAsStringAsync(booksPath);
       const allBooks = JSON.parse(booksContent);
-      
-      const updatedBooks = allBooks.map(b => 
-        b.id === id ? {...b, name: newBookName, updated_at: new Date().toISOString()} : b
+
+      const updatedBooks = allBooks.map((b) =>
+        b.id === id
+          ? { ...b, name: newBookName, updated_at: new Date().toISOString() }
+          : b
       );
-      
-      await FileSystem.writeAsStringAsync(booksPath, JSON.stringify(updatedBooks));
-      
+
+      await FileSystem.writeAsStringAsync(
+        booksPath,
+        JSON.stringify(updatedBooks)
+      );
+
       // Update local state
       addBooks(updatedBooks);
       setEditModalVisible(false);
-      
-      Toast.show({
-        type: "success",
-        text1: "Book name updated successfully",
-      });
     } catch (err) {
-      Toast.show({
-        type: "error",
-        text1: "Failed to update book name",
-      });
       console.error(err);
     }
   };
@@ -166,11 +155,28 @@ export default function BookDetails() {
         <BookMenu
           id={id}
           book={book}
-          transactions={transactionsWithBalance}
+          transactions={displayedTransactions}
+          searchQuery={searchQuery}
           setMenuVisible={setMenuVisible}
           setEditModalVisible={setEditModalVisible}
+          setIsGeneratingPdf={setIsGeneratingPdf} // নতুন প্রপ যোগ করুন
         />
       )}
+
+      {/* PDF জেনারেটিং লোডিং মডেল */}
+      <Modal
+        visible={isGeneratingPdf}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsGeneratingPdf(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ActivityIndicator size="large" color="#007aff" />
+            <Text style={styles.modalText}>PDF তৈরি হচ্ছে...</Text>
+          </View>
+        </View>
+      </Modal>
 
       <BookUpdateModal
         editModalVisible={editModalVisible}
@@ -193,7 +199,7 @@ export default function BookDetails() {
       <BookBalanceSummery transactions={displayedTransactions} />
 
       <Text style={styles.transactionCount}>
-        Showing {displayedTransactions.length} {searchQuery ? "matching " : ""}entries
+        লেনদেন দেখানো হচ্ছে {displayedTransactions.length} টি
       </Text>
 
       {displayedTransactions.length > 0 ? (
@@ -211,8 +217,8 @@ export default function BookDetails() {
       ) : (
         <Text style={styles.emptyText}>
           {searchQuery
-            ? "No matching transactions found"
-            : "No transactions found"}
+            ? "আপনার খোঁজার সাথে মিলানো কোনো লেনদেন নেই"
+            : "কোনো লেনদেন যোগ করা হয়নি"}
         </Text>
       )}
 
@@ -224,7 +230,7 @@ export default function BookDetails() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    padding: 10,
     backgroundColor: "#f8f9fa",
   },
   searchContainer: {
@@ -244,13 +250,13 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     marginLeft: 8,
-    fontFamily : 'bangla_regular'
+    fontFamily: "bangla_regular",
   },
   transactionCount: {
     fontSize: 14,
     color: "#666",
     marginBottom: 8,
-    fontFamily : 'bangla_regular'
+    fontFamily: "bangla_regular",
   },
   listContainer: {
     paddingBottom: 100,
@@ -260,12 +266,34 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
     marginTop: 20,
-    fontFamily : 'bangla_regular'
+    fontFamily: "bangla_regular",
   },
   errorText: {
     fontSize: 16,
     color: "#F44336",
     textAlign: "center",
     marginTop: 20,
+  },
+  // নতুন স্টাইল যোগ করুন
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    backgroundColor: "white",
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 200,
+    minHeight: 150,
+  },
+  modalText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontFamily: "bangla_regular",
+    textAlign: "center",
   },
 });

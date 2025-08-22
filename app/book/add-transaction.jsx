@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -12,8 +12,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ScrollView,
 } from "react-native";
-import Toast from "react-native-toast-message";
 import * as FileSystem from "expo-file-system";
 import * as Crypto from "expo-crypto";
 import { useStore } from "../../utils/z-store";
@@ -28,6 +28,8 @@ export default function AddTransaction() {
   const { bookId, transactionType } = params;
 
   const { addTransactions } = useStore();
+  const amountInputRef = useRef(null);
+  const remarkInputRef = useRef(null);
 
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -38,6 +40,7 @@ export default function AddTransaction() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [type, setType] = useState(transactionType === "income" ? "income" : "expense");
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -62,6 +65,15 @@ export default function AddTransaction() {
     loadCategories();
   }, []);
 
+  useEffect(() => {
+    // টাকার পরিমাণ ইনপুটে স্বয়ংক্রিয়ভাবে ফোকাস করুন
+    if (amountInputRef.current && !loading) {
+      setTimeout(() => {
+        amountInputRef.current?.focus();
+      }, 300);
+    }
+  }, [loading]);
+
   const handleDateChange = (event, selectedDate) => {
     setShowDatePicker(false);
     if (selectedDate) setDate(selectedDate);
@@ -77,21 +89,20 @@ export default function AddTransaction() {
     }
   };
 
-  const handleSave = async () => {
+  // কী-বোর্ডের Next বাটন হ্যান্ডলিং
+  const handleAmountSubmit = () => {
+    remarkInputRef.current?.focus();
+  };
+
+  const saveTransaction = async () => {
     if (!amount || !categoryId) {
-      Toast.show({
-        type: "error",
-        text1: "সমস্ত প্রয়োজনীয় তথ্য প্রদান করুন",
-        text2: "পরিমাণ এবং বিভাগ পূরণ করা আবশ্যক",
-      });
-      return;
+      return false;
     }
 
     try {
       const amountValue = parseFloat(amount);
-      if (isNaN(amountValue)) {
-        Toast.show({ type: "error", text1: "অবৈধ পরিমাণ" });
-        return;
+      if (isNaN(amountValue) || amountValue <= 0) {
+        return false;
       }
 
       const filePath = TRANSACTIONS_FILE(bookId);
@@ -107,7 +118,7 @@ export default function AddTransaction() {
         category: categories.find((c) => c.id === categoryId)?.name || "",
         amount: amountValue,
         remark: remark,
-        type: transactionType,
+        type: type,
         date: date.toISOString().split("T")[0],
         time: date.toTimeString().split(" ")[0],
         created_at: new Date().toISOString(),
@@ -121,21 +132,34 @@ export default function AddTransaction() {
 
       addTransactions(updatedTransactions);
 
-      Toast.show({
-        type: "success",
-        text1: "লেনদেন সফলভাবে সংরক্ষিত হয়েছে!",
-        text2: `${amountValue.toLocaleString()} টাকা ${
-          transactionType === "cashin" ? "আয়" : "খরচ"
-        } হিসাবে যোগ করা হয়েছে`,
-      });
-      router.back();
+      return true;
     } catch (err) {
-      Toast.show({
-        type: "error",
-        text1: "লেনদেন সংরক্ষণ করতে ব্যর্থ হয়েছে",
-        text2: "দয়া করে আবার চেষ্টা করুন",
-      });
       console.error("Save error:", err);
+      return false;
+    }
+  };
+
+  const handleSave = async () => {
+    const success = await saveTransaction();
+    if (success) {
+      router.back();
+    }
+  };
+
+  const handleSaveAndAddMore = async () => {
+    const success = await saveTransaction();
+    if (success) {
+      // ফর্ম রিসেট করুন কিন্তু স্ক্রিনে থাকুন
+      setAmount("");
+      setRemark("");
+      // ক্যাটাগরি এবং তারিখ একই রাখুন
+      
+      // আবার ফোকাস দিন
+      if (amountInputRef.current) {
+        setTimeout(() => {
+          amountInputRef.current.focus();
+        }, 100);
+      }
     }
   };
 
@@ -154,7 +178,7 @@ export default function AddTransaction() {
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity
           style={styles.retryButton}
-          onPress={() => setLoading(true)}
+          onPress={() => window.location.reload()}
         >
           <Text style={styles.retryButtonText}>আবার চেষ্টা করুন</Text>
         </TouchableOpacity>
@@ -166,25 +190,48 @@ export default function AddTransaction() {
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
-      <View style={styles.container}>
+      <ScrollView 
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         <Stack.Screen
           options={{
-            title:
-              transactionType === "income"
-                ? "নতুন আয় যোগ করুন"
-                : "নতুন খরচ যোগ করুন",
+            title: type === "income" ? "নতুন আয় যোগ করুন" : "নতুন খরচ যোগ করুন",
           }}
         />
+
+        {/* টাইপ টগল বাটন */}
+        <View style={styles.inputGroup}>
+          <View style={styles.toggleGroup}>
+            <TouchableOpacity
+              style={[styles.toggleButton, type === "income" && styles.activeButtonIn]}
+              onPress={() => setType("income")}
+            >
+              <Text style={type === "income" ? styles.activeTextIn : styles.inactiveText}>আয়</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleButton, type === "expense" && styles.activeButtonOut]}
+              onPress={() => setType("expense")}
+            >
+              <Text style={type === "expense" ? styles.activeTextOut : styles.inactiveText}>খরচ</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>পরিমাণ*</Text>
           <TextInput
+            ref={amountInputRef}
             style={styles.input}
             placeholder="টাকার পরিমাণ লিখুন"
             keyboardType="numeric"
             value={amount}
             onChangeText={setAmount}
+            returnKeyType="next"
+            onSubmitEditing={handleAmountSubmit}
           />
         </View>
 
@@ -249,6 +296,7 @@ export default function AddTransaction() {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>মন্তব্য</Text>
           <TextInput
+            ref={remarkInputRef}
             style={[styles.input, styles.remarkInput]}
             placeholder="অতিরিক্ত তথ্য (ঐচ্ছিক)"
             multiline
@@ -256,20 +304,28 @@ export default function AddTransaction() {
             value={remark}
             onChangeText={setRemark}
             textAlignVertical="top"
+            returnKeyType="done"
           />
         </View>
 
-        <TouchableOpacity
-          style={[
-            styles.saveButton,
-            (!amount || !categoryId) && styles.disabledButton,
-          ]}
-          onPress={handleSave}
-          disabled={!amount || !categoryId}
-        >
-          <Text style={styles.saveButtonText}>লেনদেন সংরক্ষণ করুন</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[styles.button, styles.saveButton]}
+            onPress={handleSave}
+            disabled={!amount || !categoryId}
+          >
+            <Text style={styles.buttonText}>সংরক্ষণ করুন</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.addMoreButton]}
+            onPress={handleSaveAndAddMore}
+            disabled={!amount || !categoryId}
+          >
+            <Text style={styles.buttonText}>আরো যোগ করুন</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -277,8 +333,11 @@ export default function AddTransaction() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: "#f9fafb",
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
   },
   inputGroup: {
     marginBottom: 20,
@@ -286,7 +345,7 @@ const styles = StyleSheet.create({
   label: {
     color: "#374151",
     marginBottom: 6,
-    fontFamily : 'bangla_bold',
+    fontFamily: 'bangla_bold',
   },
   input: {
     backgroundColor: "#fff",
@@ -294,7 +353,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderColor: "#e5e7eb",
     borderWidth: 1,
-    fontFamily : 'bangla_regular',
+    fontFamily: 'bangla_regular',
   },
   pickerWrapper: {
     borderWidth: 1,
@@ -322,39 +381,47 @@ const styles = StyleSheet.create({
   },
   datetimeText: {
     color: "#111827",
-    fontFamily : 'bangla_regular',
+    fontFamily: 'bangla_regular',
   },
   remarkInput: {
     minHeight: 80,
     textAlignVertical: "top",
-    fontFamily : 'bangla_regular',
+    fontFamily: 'bangla_regular',
   },
-  saveButton: {
-    backgroundColor: "#3b82f6",
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 20,
+  },
+  button: {
+    flex: 1,
     padding: 16,
     borderRadius: 10,
     alignItems: "center",
-    marginTop: 10,
   },
-  disabledButton: {
-    backgroundColor: "#9ca3af",
+  saveButton: {
+    backgroundColor: "#3b82f6",
   },
-  saveButtonText: {
+  addMoreButton: {
+    backgroundColor: "#10b981",
+  },
+  buttonText: {
     color: "#fff",
-    fontSize: 16,
-    fontFamily : 'bangla_semibold',
+    fontFamily: 'bangla_bold',
   },
   errorText: {
     textAlign: "center",
     color: "#ef4444",
     fontSize: 16,
     marginBottom: 20,
+    fontFamily: 'bangla_regular',
   },
   loadingText: {
     marginTop: 10,
     textAlign: "center",
     color: "#64748b",
-    fontFamily : 'bangla_semibold',
+    fontFamily: 'bangla_semibold',
   },
   retryButton: {
     backgroundColor: "#3b82f6",
@@ -367,6 +434,36 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontFamily : 'bangla_semibold',
+    fontFamily: 'bangla_semibold',
+  },
+  // টগল বাটন স্টাইল
+  toggleGroup: {
+    flexDirection: "row",
+    backgroundColor: "#e5e7eb",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  activeButtonIn: {
+    backgroundColor: "rgba(34, 197, 94, 0.2)",
+  },
+  activeButtonOut: {
+    backgroundColor: "rgba(239, 68, 68, 0.2)",
+  },
+  activeTextIn: {
+    color: "#22c55e",
+    fontFamily: 'bangla_bold',
+  },
+  activeTextOut: {
+    color: "#ef4444",
+    fontFamily: 'bangla_bold',
+  },
+  inactiveText: {
+    color: "#333",
+    fontFamily: 'bangla_bold',
   },
 });

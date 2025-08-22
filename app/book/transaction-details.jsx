@@ -1,23 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
+import * as FileSystem from 'expo-file-system';
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  Alert,
+  ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  ActivityIndicator,
-  Modal, // Modal ইম্পোর্ট করুন
+  View
 } from "react-native";
-import Toast from "react-native-toast-message";
-import * as FileSystem from 'expo-file-system';
 import TransactionTransferModal from "../../components/TransactionTransferModal";
 import { useStore } from "../../utils/z-store";
 
@@ -44,7 +42,7 @@ export default function TransactionDetails() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [type, setType] = useState(transaction?.type || "income");
-  const [showDeleteModal, setShowDeleteModal] = useState(false); // ডিলিট মডালের স্টেট
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -61,11 +59,6 @@ export default function TransactionDetails() {
         
         setLoading(false);
       } catch (err) {
-        Toast.show({ 
-          type: "error", 
-          text1: "লেনদেন ডেটা লোড করতে ব্যর্থ হয়েছে",
-          text2: "দয়া করে আবার চেষ্টা করুন"
-        });
         console.error(err);
       }
     };
@@ -75,11 +68,6 @@ export default function TransactionDetails() {
 
   const handleUpdate = async () => {
     if (!amount.trim() || !selectedCategory) {
-      Toast.show({ 
-        type: "error", 
-        text1: "পরিমাণ এবং বিভাগ প্রয়োজন",
-        text2: "অনুগ্রহ করে সমস্ত প্রয়োজনীয় তথ্য পূরণ করুন"
-      });
       return;
     }
 
@@ -105,18 +93,9 @@ export default function TransactionDetails() {
       await FileSystem.writeAsStringAsync(filePath, JSON.stringify(transactions));
       addTransactions(transactions);
       
-      Toast.show({ 
-        type: "success", 
-        text1: "লেনদেন সফলভাবে আপডেট করা হয়েছে",
-        text2: `${parseFloat(amount).toLocaleString()} টাকা আপডেট করা হয়েছে`
-      });
       router.back();
     } catch (err) {
-      Toast.show({ 
-        type: "error", 
-        text1: "লেনদেন আপডেট করতে ব্যর্থ হয়েছে",
-        text2: "দয়া করে আবার চেষ্টা করুন"
-      });
+
       console.error(err);
     }
   };
@@ -135,17 +114,10 @@ export default function TransactionDetails() {
       await FileSystem.writeAsStringAsync(filePath, JSON.stringify(transactions));
       addTransactions(transactions);
       
-      Toast.show({ 
-        type: "success", 
-        text1: "লেনদেন ডিলিট করা হয়েছে",
-      });
-      setShowDeleteModal(false); // মডাল বন্ধ করুন
+      setShowDeleteModal(false); 
       router.back();
     } catch (err) {
-      Toast.show({ 
-        type: "error", 
-        text1: "লেনদেন ডিলিট করতে ব্যর্থ হয়েছে",
-      });
+
       console.error(err);
     }
   };
@@ -215,6 +187,7 @@ export default function TransactionDetails() {
             value={amount}
             onChangeText={setAmount}
             keyboardType="numeric"
+            autoFocus
           />
         </View>
 
@@ -366,6 +339,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     backgroundColor: "#fff",
+    fontFamily: "bangla_regular",
   },
   multilineInput: { 
     minHeight: 80, 

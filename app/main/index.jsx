@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -16,9 +17,6 @@ import BookItem from "../../components/BookItem";
 import CreateBookModal from "../../components/CreateBookModal";
 import NoBooksFound from "../../components/NoBooksFound";
 import { useStore } from "../../utils/z-store";
-import { useFocusEffect } from '@react-navigation/native';
-
-const BUSINESS_FILE = FileSystem.documentDirectory + 'business.json';
 const BOOK_FILE = FileSystem.documentDirectory + 'books.json';
 const APP_SETTINGS_FILE = FileSystem.documentDirectory + 'settings.json';
 
@@ -192,6 +190,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: "#666",
+    fontFamily: 'bangla_semibold'
   },
   listContainer: {
     padding: 16,
