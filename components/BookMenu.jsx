@@ -219,7 +219,7 @@ const handlePdf = async () => {
           .summary-title { font-size: 13px; color: #7f8c8d; margin-bottom: 5px; }
           .summary-value { font-size: 16px; font-weight: bold; }
           .footer { margin-top: 30px; font-size: 10px; text-align: center; color: #666; padding: 15px; }
-          .contact-info { margin-top: 10px; font-size: 11px; }
+          .contact-info { font-size: 11px; }
           .positive { color: #27ae60; font-weight: 500; }
           .negative { color: #e74c3c; font-weight: 500; }
         </style>

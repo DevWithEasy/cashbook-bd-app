@@ -117,7 +117,6 @@ export default function Backup() {
           });
           fileContents[fileName] = content;
           filesFound++;
-          console.log(`Added to backup: ${fileName}`);
         } catch (error) {
           console.error(`Error reading file ${fileName}:`, error);
           hasError = true;

@@ -18,7 +18,6 @@ import {
 } from "react-native";
 
 const APP_DIR = FileSystem.documentDirectory;
-
 const BACKUP_SIGNATURE = "CASHBOOK_APP_BD_v1";
 
 export default function Restore() {
@@ -36,13 +35,22 @@ export default function Restore() {
         copyToCacheDirectory: true,
       });
 
-      if (result.type === "cancel") {
+      // ইউজার যদি ফাইল সিলেক্ট না করে বাতিল করে
+      if (result.canceled) {
+        Alert.alert("তথ্য", "আপনি কোন ফাইল নির্বাচন করেননি।");
+        return;
+      }
+
+      // assets array খালি থাকলে
+      if (!result.assets || result.assets.length === 0) {
+        Alert.alert("তথ্য", "আপনি কোন ফাইল নির্বাচন করেননি।");
         return;
       }
 
       const file = result.assets[0];
       if (!file) {
-        throw new Error("No valid file found");
+        Alert.alert("তথ্য", "আপনি কোন ফাইল নির্বাচন করেননি।");
+        return;
       }
 
       // Get file size and format it
@@ -72,8 +80,7 @@ export default function Restore() {
       }
 
     } catch (error) {
-      console.error("Error picking file:", error);
-      Alert.alert("ত্রুটি", `ফাইল নির্বাচন করতে ব্যর্থ: ${error.message}`);
+      console.log("File selection canceled by user" + error);
     }
   };
 
@@ -107,7 +114,7 @@ export default function Restore() {
             const signatureData = new TextDecoder().decode(unzipped["backup_signature.json"]);
             const signatureInfo = JSON.parse(signatureData);
             
-            // স্বাক্ষর মিলছে কিনা চেক করুন
+            // স্বাক্ষর मिलছে কिना চেক করুন
             const isValid = signatureInfo.signature === BACKUP_SIGNATURE;
             
             resolve({ 
@@ -203,7 +210,7 @@ export default function Restore() {
       });
 
       // ✅ Success Alert with Restart
-      Alert.alert("সফল", "ডাটা সফলভাবে রিস্টোর হয়েছে!", [
+      Alert.alert("সফল", "ডাটا সফলভাবে রিস্টোর হয়েছে!", [
         {
           text: "ঠিক আছে",
           onPress: async () => {
@@ -320,7 +327,7 @@ export default function Restore() {
             <Text style={styles.title}>ডাটা রিস্টোর</Text>
             <Text style={styles.subtitle}>
               আপনার অ্যাপের সমস্ত ডেটা এবং সেটিংস পুনরুদ্ধার করতে আপনার ব্যাকআপ
-              ফাইলটি নির্বাচন করুন। আপনি যেন একটি বিশ্বস্ত উৎস থেকে পুনরুদ্ধার
+              ফাইলটি নির্বাচন করুন। আপনি যেন একটি বিশ্বস্ত উৎস থেকে पুনরুদ্ধার
               করছেন, তা নিশ্চিত করুন।
             </Text>
           </View>
@@ -395,7 +402,7 @@ export default function Restore() {
           </View>
 
           {/* Restore Button - Only shown when file is selected */}
-          <TouchableOpacity
+          {isValidBackup && <TouchableOpacity
             style={[
               styles.restoreButton,
               isProcessing && styles.buttonDisabled,
@@ -412,10 +419,10 @@ export default function Restore() {
                 <Text style={styles.buttonText}>ডাটা রিস্টোর করুন</Text>
               </>
             )}
-          </TouchableOpacity>
-          <Text style={styles.note}>
-            দ্রষ্টব্য: এটি আপনার বর্তমান ডেটা মুছে ফেলবে। প্রয়োজনে আপনার কাছে
-            একটি ব্যাকআপ আছে কিনা, তা নিশ্চিত করুন।
+          </TouchableOpacity>}
+          <Text style={isValidBackup ? styles.note : styles.invalidNote}>
+            {isValidBackup ? 'দ্রষ্টব্য: এটি আপনার বর্তমান ডেটা মুছে ফেলবে। প্রয়োজনে আপনার কাছে একটি ব্যাকআপ আছে কিনা, তা নিশ্চিত করুন।' :
+            'দ্রষ্টব্য: এই ফাইলটি একটি এই অ্যাপের ব্যাকআপ ফাইল নয়। আপনি এটি রিস্টোর করতে পারবে না।'}
           </Text>
         </View>
       )}
@@ -533,6 +540,14 @@ const styles = StyleSheet.create({
     fontFamily: "bangla_regular",
     fontSize: 12,
     color: "#adb5bd",
+    textAlign: "center",
+    marginTop: 24,
+    maxWidth: "90%",
+  },
+  invalidNote: {
+    fontFamily: "bangla_regular",
+    fontSize: 12,
+    color: "#ef4444",
     textAlign: "center",
     marginTop: 24,
     maxWidth: "90%",

@@ -11,7 +11,7 @@ export default function SplashContainer() {
                 />
               </View>
         <Text style={styles.splashText}>ক্যাশবুক BD</Text>
-        <Text style={styles.splashSubtext}>আপনার আর্থিক সঙ্গী</Text>
+        <Text style={styles.splashSubtext}>আপনার ব্যক্তিগত আর্থিক ব্যবস্থাপক</Text>
       </View>
   );
 }

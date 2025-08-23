@@ -187,7 +187,6 @@ export default function TransactionDetails() {
             value={amount}
             onChangeText={setAmount}
             keyboardType="numeric"
-            autoFocus
           />
         </View>
 

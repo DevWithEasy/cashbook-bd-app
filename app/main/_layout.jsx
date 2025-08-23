@@ -198,12 +198,13 @@ export default function MainLayout() {
           borderTopColor: "#e5e5e5",
           height: 60,
           paddingBottom: 8,
-          paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: "500",
           fontFamily: "bangla_medium",
+        },
+        tabBarItemStyle: {
+          paddingBottom: 4,
         },
       }}
     >

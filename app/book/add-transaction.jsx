@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
   ScrollView,
+  Alert,
 } from "react-native";
 import * as FileSystem from "expo-file-system";
 import * as Crypto from "expo-crypto";
@@ -52,10 +53,24 @@ export default function AddTransaction() {
           setCategories(loadedCategories);
           if (loadedCategories.length > 0) {
             setCategoryId(loadedCategories[0].id);
+          } else {
+            Alert.alert(
+              "ক্যাটাগরি পাওয়া যায়নি",
+              "প্রথমে ক্যাটাগরি যোগ করুন",
+              [{ text: "ঠিক আছে" }]
+            );
           }
+        } else {
+          Alert.alert(
+            "ক্যাটাগরি পাওয়া যায়নি",
+            "প্রথমে ক্যাটাগরি যোগ করুন",
+            [{ text: "ঠিক আছে" }]
+          );
         }
       } catch (err) {
-        setError("ক্যাটাগরি লোড করতে ব্যর্থ হয়েছে");
+        const errorMsg = "ক্যাটাগরি লোড করতে ব্যর্থ হয়েছে";
+        setError(errorMsg);
+        Alert.alert("ত্রুটি", errorMsg, [{ text: "ঠিক আছে" }]);
         console.error("Category load error:", err);
       } finally {
         setLoading(false);
@@ -76,7 +91,9 @@ export default function AddTransaction() {
 
   const handleDateChange = (event, selectedDate) => {
     setShowDatePicker(false);
-    if (selectedDate) setDate(selectedDate);
+    if (selectedDate) {
+      setDate(selectedDate);
+    }
   };
 
   const handleTimeChange = (event, selectedTime) => {
@@ -96,12 +113,22 @@ export default function AddTransaction() {
 
   const saveTransaction = async () => {
     if (!amount || !categoryId) {
+      Alert.alert(
+        "অপূর্ণ তথ্য",
+        "টাকার পরিমাণ এবং বিভাগ পূরণ করা আবশ্যক",
+        [{ text: "ঠিক আছে" }]
+      );
       return false;
     }
 
     try {
       const amountValue = parseFloat(amount);
       if (isNaN(amountValue) || amountValue <= 0) {
+        Alert.alert(
+          "অবৈধ পরিমাণ",
+          "টাকার পরিমাণ অবশ্যই একটি বৈধ সংখ্যা হতে হবে",
+          [{ text: "ঠিক আছে" }]
+        );
         return false;
       }
 
@@ -134,7 +161,9 @@ export default function AddTransaction() {
 
       return true;
     } catch (err) {
+      const errorMsg = "লেনদেন সংরক্ষণ করতে সমস্যা হয়েছে";
       console.error("Save error:", err);
+      Alert.alert("ত্রুটি", errorMsg, [{ text: "ঠিক আছে" }]);
       return false;
     }
   };
@@ -142,7 +171,9 @@ export default function AddTransaction() {
   const handleSave = async () => {
     const success = await saveTransaction();
     if (success) {
-      router.back();
+      setTimeout(() => {
+        router.back();
+      }, 1000);
     }
   };
 
@@ -161,6 +192,16 @@ export default function AddTransaction() {
         }, 100);
       }
     }
+  };
+
+  // টাইপ পরিবর্তন করলে এলার্ট দেখান
+  const handleTypeChange = (newType) => {
+    setType(newType);
+  };
+
+  // বিভাগ পরিবর্তন করলে এলার্ট দেখান
+  const handleCategoryChange = (newCategoryId) => {
+    setCategoryId(newCategoryId);
   };
 
   if (loading) {
@@ -208,13 +249,13 @@ export default function AddTransaction() {
           <View style={styles.toggleGroup}>
             <TouchableOpacity
               style={[styles.toggleButton, type === "income" && styles.activeButtonIn]}
-              onPress={() => setType("income")}
+              onPress={() => handleTypeChange("income")}
             >
               <Text style={type === "income" ? styles.activeTextIn : styles.inactiveText}>আয়</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toggleButton, type === "expense" && styles.activeButtonOut]}
-              onPress={() => setType("expense")}
+              onPress={() => handleTypeChange("expense")}
             >
               <Text style={type === "expense" ? styles.activeTextOut : styles.inactiveText}>খরচ</Text>
             </TouchableOpacity>
@@ -240,7 +281,7 @@ export default function AddTransaction() {
           <View style={styles.pickerWrapper}>
             <Picker
               selectedValue={categoryId}
-              onValueChange={setCategoryId}
+              onValueChange={handleCategoryChange}
               dropdownIconColor="#3b82f6"
             >
               {categories.map((cat) => (
@@ -310,7 +351,7 @@ export default function AddTransaction() {
 
         <View style={styles.buttonRow}>
           <TouchableOpacity
-            style={[styles.button, styles.saveButton]}
+            style={[styles.button, styles.saveButton, (!amount || !categoryId) && styles.disabledButton]}
             onPress={handleSave}
             disabled={!amount || !categoryId}
           >
@@ -318,7 +359,7 @@ export default function AddTransaction() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.button, styles.addMoreButton]}
+            style={[styles.button, styles.addMoreButton, (!amount || !categoryId) && styles.disabledButton]}
             onPress={handleSaveAndAddMore}
             disabled={!amount || !categoryId}
           >
@@ -405,6 +446,10 @@ const styles = StyleSheet.create({
   },
   addMoreButton: {
     backgroundColor: "#10b981",
+  },
+  disabledButton: {
+    backgroundColor: "#9ca3af",
+    opacity: 0.7,
   },
   buttonText: {
     color: "#fff",

@@ -96,7 +96,7 @@ export default function CreateBookModal({
         <View style={styles.card}>
           {/* হেডার সেকশন */}
           <View style={styles.header}>
-            <Text style={styles.title}>নতুন খাতা তৈরি করুন</Text>
+            <Text style={styles.title}>নতুন বই তৈরি করুন</Text>
             <TouchableOpacity 
               onPress={() => !isCreating && setModalVisible(false)}
               disabled={isCreating}
@@ -107,7 +107,7 @@ export default function CreateBookModal({
 
           {/* ইনপুট সেকশন */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>খাতার নাম</Text>
+            <Text style={styles.label}>বইয়ের নাম</Text>
             <TextInput
               style={styles.input}
               placeholder="যেমন: দৈনন্দিন খরচ, মাসিক আয় ইত্যাদি"
