@@ -1,4 +1,5 @@
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Buffer } from "buffer";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
@@ -208,6 +209,8 @@ export default function Restore() {
           Promise.all(savePromises).then(resolve).catch(reject);
         });
       });
+
+      await AsyncStorage.setItem('app_init','true')
 
       // ✅ Success Alert with Restart
       Alert.alert("সফল", "ডাটا সফলভাবে রিস্টোর হয়েছে!", [

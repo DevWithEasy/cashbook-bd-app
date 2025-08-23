@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 
-const APP_SETTINGS_FILE = FileSystem.documentDirectory + "app_settings.json";
+const APP_SETTINGS_FILE = FileSystem.documentDirectory + "settings.json";
 
 export default function Profile() {
   const router = useRouter();

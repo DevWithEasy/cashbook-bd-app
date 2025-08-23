@@ -9,7 +9,6 @@ import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } f
 
 const BUSINESS_FILE = FileSystem.documentDirectory + "business.json";
 const SETTINGS_FILE = FileSystem.documentDirectory + "settings.json";
-const APP_SETTINGS_FILE = FileSystem.documentDirectory + "app_settings.json";
 
 const settings = [
   {
@@ -56,7 +55,6 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [isBiometricEnabled, setIsBiometricEnabled] = useState(false);
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
-  const [appSettings, setAppSettings] = useState(null);
   const [userData, setUserData] = useState({
     name: '',
     mobile: '',
@@ -86,7 +84,6 @@ export default function Settings() {
         (b) => b.id === settingsData.selected_business
       );
       setSelectedBusiness(selected);
-      setAppSettings(settingsData);
     } catch (error) {
       console.error("Business data load error:", error);
       Alert.alert("ত্রুটি", "ব্যবসা ডেটা লোড করতে ব্যর্থ হয়েছে");
@@ -97,9 +94,9 @@ export default function Settings() {
 
   const loadUserData = async () => {
     try {
-      const fileInfo = await FileSystem.getInfoAsync(APP_SETTINGS_FILE);
+      const fileInfo = await FileSystem.getInfoAsync(SETTINGS_FILE);
       if (fileInfo.exists) {
-        const fileContent = await FileSystem.readAsStringAsync(APP_SETTINGS_FILE);
+        const fileContent = await FileSystem.readAsStringAsync(SETTINGS_FILE);
         const settings = JSON.parse(fileContent);
         setUserData({
           name: settings.name || '',
@@ -194,7 +191,7 @@ export default function Settings() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>লোড হচ্ছে...</Text>
+        <Text style={{fontFamily : 'bangla_semibold'}}>লোড হচ্ছে...</Text>
       </View>
     );
   }
