@@ -1,22 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
+import * as Crypto from "expo-crypto";
+import * as FileSystem from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  ScrollView,
-  Alert,
 } from "react-native";
-import * as FileSystem from "expo-file-system";
-import * as Crypto from "expo-crypto";
 import { useStore } from "../../utils/z-store";
 
 const TRANSACTIONS_FILE = (bookId) =>
@@ -29,95 +31,126 @@ export default function AddTransaction() {
   const { bookId, transactionType } = params;
 
   const { addTransactions } = useStore();
-  const amountInputRef = useRef(null);
-  const remarkInputRef = useRef(null);
 
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [categories, setCategories] = useState([]);
   const [remark, setRemark] = useState("");
   const [date, setDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false); 
+  const [showTimePicker, setShowTimePicker] = useState(false); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [type, setType] = useState(transactionType === "income" ? "income" : "expense");
+  const [type, setType] = useState(
+    transactionType === "income" ? "income" : "expense"
+  );
+
+  // ---- Load categories ----
+  const loadCategories = async () => {
+    try {
+      setLoading(true);
+      const fileInfo = await FileSystem.getInfoAsync(CATEGORIES_FILE);
+      if (fileInfo.exists) {
+        const content = await FileSystem.readAsStringAsync(CATEGORIES_FILE);
+        const loadedCategories = JSON.parse(content);
+        setCategories(loadedCategories);
+        if (loadedCategories.length > 0) {
+          setCategoryId((prev) => prev || loadedCategories[0].id);
+        } else {
+          Alert.alert("ক্যাটাগরি পাওয়া যায়নি", "প্রথমে ক্যাটাগরি যোগ করুন", [
+            { text: "ঠিক আছে" },
+          ]);
+        }
+      } else {
+        Alert.alert("ক্যাটাগরি পাওয়া যায়নি", "প্রথমে ক্যাটাগরি যোগ করুন", [
+          { text: "ঠিক আছে" },
+        ]);
+      }
+      setError(null);
+    } catch (err) {
+      const errorMsg = "ক্যাটাগরি লোড করতে ব্যর্থ হয়েছে";
+      setError(errorMsg);
+      console.error("Category load error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const fileInfo = await FileSystem.getInfoAsync(CATEGORIES_FILE);
-        if (fileInfo.exists) {
-          const content = await FileSystem.readAsStringAsync(CATEGORIES_FILE);
-          const loadedCategories = JSON.parse(content);
-          setCategories(loadedCategories);
-          if (loadedCategories.length > 0) {
-            setCategoryId(loadedCategories[0].id);
-          } else {
-            Alert.alert(
-              "ক্যাটাগরি পাওয়া যায়নি",
-              "প্রথমে ক্যাটাগরি যোগ করুন",
-              [{ text: "ঠিক আছে" }]
-            );
-          }
-        } else {
-          Alert.alert(
-            "ক্যাটাগরি পাওয়া যায়নি",
-            "প্রথমে ক্যাটাগরি যোগ করুন",
-            [{ text: "ঠিক আছে" }]
-          );
-        }
-      } catch (err) {
-        const errorMsg = "ক্যাটাগরি লোড করতে ব্যর্থ হয়েছে";
-        setError(errorMsg);
-        Alert.alert("ত্রুটি", errorMsg, [{ text: "ঠিক আছে" }]);
-        console.error("Category load error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadCategories();
   }, []);
 
-  useEffect(() => {
-    // টাকার পরিমাণ ইনপুটে স্বয়ংক্রিয়ভাবে ফোকাস করুন
-    if (amountInputRef.current && !loading) {
-      setTimeout(() => {
-        amountInputRef.current?.focus();
-      }, 300);
+  // ---- Common onChange handlers (Android + iOS) ----
+  const onChangeDate = (event, selectedDate) => {
+    if (Platform.OS === "android") {
+    } else {
+      setShowDatePicker(false);
     }
-  }, [loading]);
 
-  const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setDate(selectedDate);
-    }
+    if (event?.type && event.type !== "set") return;
+    if (!selectedDate) return;
+
+    const updated = new Date(date);
+    updated.setFullYear(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      selectedDate.getDate()
+    );
+    setDate(updated);
+    console.log("Selected date:", updated.toISOString());
   };
 
-  const handleTimeChange = (event, selectedTime) => {
-    setShowTimePicker(false);
-    if (selectedTime) {
-      const newDate = new Date(date);
-      newDate.setHours(selectedTime.getHours());
-      newDate.setMinutes(selectedTime.getMinutes());
-      setDate(newDate);
+  const onChangeTime = (event, selectedTime) => {
+    if (Platform.OS === "android") {
+      // Android dialog closes itself
+    } else {
+      setShowTimePicker(false);
     }
+
+    if (event?.type && event.type !== "set") return;
+    if (!selectedTime) return;
+
+    // keep date part, change only H/M
+    const updated = new Date(date);
+    updated.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
+    setDate(updated);
+    console.log("Selected time:", updated.toTimeString());
   };
 
-  // কী-বোর্ডের Next বাটন হ্যান্ডলিং
-  const handleAmountSubmit = () => {
-    remarkInputRef.current?.focus();
+  // ---- Android openers (much more reliable) ----
+  const openAndroidDate = () => {
+    if (Platform.OS !== "android") {
+      setShowDatePicker(true);
+      return;
+    }
+    DateTimePickerAndroid.open({
+      value: date,
+      onChange: onChangeDate,
+      mode: "date",
+      is24Hour: true,
+      display: "calendar", // or 'default'
+    });
+  };
+
+  const openAndroidTime = () => {
+    if (Platform.OS !== "android") {
+      setShowTimePicker(true);
+      return;
+    }
+    DateTimePickerAndroid.open({
+      value: date,
+      onChange: onChangeTime,
+      mode: "time",
+      is24Hour: true,
+      display: "clock", // or 'default'
+    });
   };
 
   const saveTransaction = async () => {
     if (!amount || !categoryId) {
-      Alert.alert(
-        "অপূর্ণ তথ্য",
-        "টাকার পরিমাণ এবং বিভাগ পূরণ করা আবশ্যক",
-        [{ text: "ঠিক আছে" }]
-      );
+      Alert.alert("অপূর্ণ তথ্য", "টাকার পরিমাণ এবং বিভাগ পূরণ করা আবশ্যক", [
+        { text: "ঠিক আছে" },
+      ]);
       return false;
     }
 
@@ -146,8 +179,8 @@ export default function AddTransaction() {
         amount: amountValue,
         remark: remark,
         type: type,
-        date: date.toISOString().split("T")[0],
-        time: date.toTimeString().split(" ")[0],
+        date: date.toISOString().split("T")[0], // YYYY-MM-DD
+        time: date.toTimeString().split(" ")[0], // HH:mm:ss
         created_at: new Date().toISOString(),
       };
 
@@ -158,7 +191,6 @@ export default function AddTransaction() {
       );
 
       addTransactions(updatedTransactions);
-
       return true;
     } catch (err) {
       const errorMsg = "লেনদেন সংরক্ষণ করতে সমস্যা হয়েছে";
@@ -173,36 +205,20 @@ export default function AddTransaction() {
     if (success) {
       setTimeout(() => {
         router.back();
-      }, 1000);
+      }, 600);
     }
   };
 
   const handleSaveAndAddMore = async () => {
     const success = await saveTransaction();
     if (success) {
-      // ফর্ম রিসেট করুন কিন্তু স্ক্রিনে থাকুন
       setAmount("");
       setRemark("");
-      // ক্যাটাগরি এবং তারিখ একই রাখুন
-      
-      // আবার ফোকাস দিন
-      if (amountInputRef.current) {
-        setTimeout(() => {
-          amountInputRef.current.focus();
-        }, 100);
-      }
     }
   };
 
-  // টাইপ পরিবর্তন করলে এলার্ট দেখান
-  const handleTypeChange = (newType) => {
-    setType(newType);
-  };
-
-  // বিভাগ পরিবর্তন করলে এলার্ট দেখান
-  const handleCategoryChange = (newCategoryId) => {
-    setCategoryId(newCategoryId);
-  };
+  const handleTypeChange = (newType) => setType(newType);
+  const handleCategoryChange = (newCategoryId) => setCategoryId(newCategoryId);
 
   if (loading) {
     return (
@@ -217,10 +233,7 @@ export default function AddTransaction() {
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => window.location.reload()}
-        >
+        <TouchableOpacity style={styles.retryButton} onPress={loadCategories}>
           <Text style={styles.retryButtonText}>আবার চেষ্টা করুন</Text>
         </TouchableOpacity>
       </View>
@@ -233,49 +246,71 @@ export default function AddTransaction() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
-      <ScrollView 
+      <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
         <Stack.Screen
           options={{
-            title: type === "income" ? "নতুন আয় যোগ করুন" : "নতুন খরচ যোগ করুন",
+            title:
+              type === "income" ? "নতুন আয় যোগ করুন" : "নতুন খরচ যোগ করুন",
           }}
         />
 
-        {/* টাইপ টগল বাটন */}
+        {/* টাইপ টগল */}
         <View style={styles.inputGroup}>
           <View style={styles.toggleGroup}>
             <TouchableOpacity
-              style={[styles.toggleButton, type === "income" && styles.activeButtonIn]}
+              style={[
+                styles.toggleButton,
+                type === "income" && styles.activeButtonIn,
+              ]}
               onPress={() => handleTypeChange("income")}
             >
-              <Text style={type === "income" ? styles.activeTextIn : styles.inactiveText}>আয়</Text>
+              <Text
+                style={
+                  type === "income" ? styles.activeTextIn : styles.inactiveText
+                }
+              >
+                আয়
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.toggleButton, type === "expense" && styles.activeButtonOut]}
+              style={[
+                styles.toggleButton,
+                type === "expense" && styles.activeButtonOut,
+              ]}
               onPress={() => handleTypeChange("expense")}
             >
-              <Text style={type === "expense" ? styles.activeTextOut : styles.inactiveText}>খরচ</Text>
+              <Text
+                style={
+                  type === "expense"
+                    ? styles.activeTextOut
+                    : styles.inactiveText
+                }
+              >
+                খরচ
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
+        {/* পরিমাণ */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>পরিমাণ*</Text>
           <TextInput
-            ref={amountInputRef}
             style={styles.input}
             placeholder="টাকার পরিমাণ লিখুন"
             keyboardType="numeric"
             value={amount}
             onChangeText={setAmount}
             returnKeyType="next"
-            onSubmitEditing={handleAmountSubmit}
+            autoFocus
           />
         </View>
 
+        {/* বিভাগ */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>বিভাগ*</Text>
           <View style={styles.pickerWrapper}>
@@ -291,12 +326,13 @@ export default function AddTransaction() {
           </View>
         </View>
 
+        {/* তারিখ ও সময় */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>তারিখ ও সময়*</Text>
           <View style={styles.datetimeRow}>
             <TouchableOpacity
               style={styles.datetimeButton}
-              onPress={() => setShowDatePicker(true)}
+              onPress={openAndroidDate}
             >
               <Ionicons name="calendar" size={18} color="#3b82f6" />
               <Text style={styles.datetimeText}>
@@ -306,7 +342,7 @@ export default function AddTransaction() {
 
             <TouchableOpacity
               style={styles.datetimeButton}
-              onPress={() => setShowTimePicker(true)}
+              onPress={openAndroidTime}
             >
               <Ionicons name="time" size={18} color="#3b82f6" />
               <Text style={styles.datetimeText}>
@@ -318,26 +354,30 @@ export default function AddTransaction() {
             </TouchableOpacity>
           </View>
 
-          {showDatePicker && (
+          {/* iOS pickers only */}
+          {Platform.OS === "ios" && showDatePicker && (
             <DateTimePicker
               value={date}
               mode="date"
-              onChange={handleDateChange}
+              display="spinner"
+              onChange={onChangeDate}
             />
           )}
-          {showTimePicker && (
+          {Platform.OS === "ios" && showTimePicker && (
             <DateTimePicker
               value={date}
               mode="time"
-              onChange={handleTimeChange}
+              display="spinner"
+              onChange={onChangeTime}
+              is24Hour={true}
             />
           )}
         </View>
 
-        <View style={styles.inputGroup}>
+        {/* মন্তব্য */}
+        <View className="inputGroup">
           <Text style={styles.label}>মন্তব্য</Text>
           <TextInput
-            ref={remarkInputRef}
             style={[styles.input, styles.remarkInput]}
             placeholder="অতিরিক্ত তথ্য (ঐচ্ছিক)"
             multiline
@@ -349,9 +389,14 @@ export default function AddTransaction() {
           />
         </View>
 
+        {/* বাটন */}
         <View style={styles.buttonRow}>
           <TouchableOpacity
-            style={[styles.button, styles.saveButton, (!amount || !categoryId) && styles.disabledButton]}
+            style={[
+              styles.button,
+              styles.saveButton,
+              (!amount || !categoryId) && styles.disabledButton,
+            ]}
             onPress={handleSave}
             disabled={!amount || !categoryId}
           >
@@ -359,7 +404,11 @@ export default function AddTransaction() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.button, styles.addMoreButton, (!amount || !categoryId) && styles.disabledButton]}
+            style={[
+              styles.button,
+              styles.addMoreButton,
+              (!amount || !categoryId) && styles.disabledButton,
+            ]}
             onPress={handleSaveAndAddMore}
             disabled={!amount || !categoryId}
           >
@@ -372,29 +421,17 @@ export default function AddTransaction() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f9fafb",
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    color: "#374151",
-    marginBottom: 6,
-    fontFamily: 'bangla_bold',
-  },
+  container: { flex: 1, backgroundColor: "#f9fafb" },
+  scrollContent: { padding: 20, paddingBottom: 40 },
+  inputGroup: { marginBottom: 20 },
+  label: { color: "#374151", marginBottom: 6, fontFamily: "bangla_bold" },
   input: {
     backgroundColor: "#fff",
     padding: 14,
     borderRadius: 10,
     borderColor: "#e5e7eb",
     borderWidth: 1,
-    fontFamily: 'bangla_regular',
+    fontFamily: "bangla_regular",
   },
   pickerWrapper: {
     borderWidth: 1,
@@ -420,14 +457,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     gap: 10,
   },
-  datetimeText: {
-    color: "#111827",
-    fontFamily: 'bangla_regular',
-  },
+  datetimeText: { color: "#111827", fontFamily: "bangla_regular" },
   remarkInput: {
     minHeight: 80,
     textAlignVertical: "top",
-    fontFamily: 'bangla_regular',
+    fontFamily: "bangla_regular",
   },
   buttonRow: {
     flexDirection: "row",
@@ -435,38 +469,23 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 20,
   },
-  button: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  saveButton: {
-    backgroundColor: "#3b82f6",
-  },
-  addMoreButton: {
-    backgroundColor: "#10b981",
-  },
-  disabledButton: {
-    backgroundColor: "#9ca3af",
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: "#fff",
-    fontFamily: 'bangla_bold',
-  },
+  button: { flex: 1, padding: 16, borderRadius: 10, alignItems: "center" },
+  saveButton: { backgroundColor: "#3b82f6" },
+  addMoreButton: { backgroundColor: "#10b981" },
+  disabledButton: { backgroundColor: "#9ca3af", opacity: 0.7 },
+  buttonText: { color: "#fff", fontFamily: "bangla_bold" },
   errorText: {
     textAlign: "center",
     color: "#ef4444",
     fontSize: 16,
     marginBottom: 20,
-    fontFamily: 'bangla_regular',
+    fontFamily: "bangla_regular",
   },
   loadingText: {
     marginTop: 10,
     textAlign: "center",
     color: "#64748b",
-    fontFamily: 'bangla_semibold',
+    fontFamily: "bangla_semibold",
   },
   retryButton: {
     backgroundColor: "#3b82f6",
@@ -479,36 +498,18 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontFamily: 'bangla_semibold',
+    fontFamily: "bangla_semibold",
   },
-  // টগল বাটন স্টাইল
   toggleGroup: {
     flexDirection: "row",
     backgroundColor: "#e5e7eb",
     borderRadius: 8,
     overflow: "hidden",
   },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  activeButtonIn: {
-    backgroundColor: "rgba(34, 197, 94, 0.2)",
-  },
-  activeButtonOut: {
-    backgroundColor: "rgba(239, 68, 68, 0.2)",
-  },
-  activeTextIn: {
-    color: "#22c55e",
-    fontFamily: 'bangla_bold',
-  },
-  activeTextOut: {
-    color: "#ef4444",
-    fontFamily: 'bangla_bold',
-  },
-  inactiveText: {
-    color: "#333",
-    fontFamily: 'bangla_bold',
-  },
+  toggleButton: { flex: 1, paddingVertical: 12, alignItems: "center" },
+  activeButtonIn: { backgroundColor: "rgba(34, 197, 94, 0.2)" },
+  activeButtonOut: { backgroundColor: "rgba(239, 68, 68, 0.2)" },
+  activeTextIn: { color: "#22c55e", fontFamily: "bangla_bold" },
+  activeTextOut: { color: "#ef4444", fontFamily: "bangla_bold" },
+  inactiveText: { color: "#333", fontFamily: "bangla_bold" },
 });

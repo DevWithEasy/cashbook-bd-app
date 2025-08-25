@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -14,28 +16,36 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import TransactionTransferModal from "../../components/TransactionTransferModal";
 import { useStore } from "../../utils/z-store";
 
-const TRANSACTIONS_FILE = (bookId) => FileSystem.documentDirectory + `book_${bookId}.json`;
-const CATEGORIES_FILE = FileSystem.documentDirectory + 'categories.json';
-const BOOKS_FILE = FileSystem.documentDirectory + 'books.json';
+const TRANSACTIONS_FILE = (bookId) =>
+  FileSystem.documentDirectory + `book_${bookId}.json`;
+const CATEGORIES_FILE = FileSystem.documentDirectory + "categories.json";
+const BOOKS_FILE = FileSystem.documentDirectory + "books.json";
 
 export default function TransactionDetails() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const transaction = params.transaction ? JSON.parse(params.transaction) : null;
+  const transaction = params.transaction
+    ? JSON.parse(params.transaction)
+    : null;
   const { addTransactions, books } = useStore();
 
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState(transaction?.amount?.toString() || "");
   const [remark, setRemark] = useState(transaction?.remark || "");
-  const [date, setDate] = useState(transaction?.date ? new Date(transaction.date) : new Date());
-  const [time, setTime] = useState(transaction?.time ? new Date(`1970-01-01T${transaction.time}`) : new Date());
+  const [date, setDate] = useState(
+    transaction?.date
+      ? new Date(transaction.date + "T" + (transaction.time || "00:00:00"))
+      : new Date()
+  );
   const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(transaction?.category_id || null);
+  const [selectedCategory, setSelectedCategory] = useState(
+    transaction?.category_id || null
+  );
   const [selectedBook, setSelectedBook] = useState(transaction?.book_id || null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [currentBookName, setCurrentBookName] = useState("");
@@ -48,15 +58,17 @@ export default function TransactionDetails() {
     const loadData = async () => {
       try {
         // Load categories
-        const categoriesContent = await FileSystem.readAsStringAsync(CATEGORIES_FILE);
+        const categoriesContent = await FileSystem.readAsStringAsync(
+          CATEGORIES_FILE
+        );
         setCategories(JSON.parse(categoriesContent));
-        
+
         // Set current book name
         const booksContent = await FileSystem.readAsStringAsync(BOOKS_FILE);
         const allBooks = JSON.parse(booksContent);
-        const currentBook = allBooks.find(b => b.id === transaction?.book_id);
+        const currentBook = allBooks.find((b) => b.id === transaction?.book_id);
         setCurrentBookName(currentBook?.name || "অজানা");
-        
+
         setLoading(false);
       } catch (err) {
         console.error(err);
@@ -65,6 +77,71 @@ export default function TransactionDetails() {
 
     loadData();
   }, []);
+
+  // ---- Common onChange handlers (Android + iOS) ----
+  const onChangeDate = (event, selectedDate) => {
+    if (Platform.OS === "android") {
+      // Android dialog closes itself
+    } else {
+      setShowDatePicker(false);
+    }
+
+    if (event?.type && event.type !== "set") return;
+    if (!selectedDate) return;
+
+    const updated = new Date(date);
+    updated.setFullYear(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      selectedDate.getDate()
+    );
+    setDate(updated);
+  };
+
+  const onChangeTime = (event, selectedTime) => {
+    if (Platform.OS === "android") {
+      // Android dialog closes itself
+    } else {
+      setShowTimePicker(false);
+    }
+
+    if (event?.type && event.type !== "set") return;
+    if (!selectedTime) return;
+
+    // keep date part, change only H/M
+    const updated = new Date(date);
+    updated.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
+    setDate(updated);
+  };
+
+  // ---- Android openers (much more reliable) ----
+  const openAndroidDate = () => {
+    if (Platform.OS !== "android") {
+      setShowDatePicker(true);
+      return;
+    }
+    DateTimePickerAndroid.open({
+      value: date,
+      onChange: onChangeDate,
+      mode: "date",
+      is24Hour: true,
+      display: "calendar", // or 'default'
+    });
+  };
+
+  const openAndroidTime = () => {
+    if (Platform.OS !== "android") {
+      setShowTimePicker(true);
+      return;
+    }
+    DateTimePickerAndroid.open({
+      value: date,
+      onChange: onChangeTime,
+      mode: "time",
+      is24Hour: true,
+      display: "clock", // or 'default'
+    });
+  };
 
   const handleUpdate = async () => {
     if (!amount.trim() || !selectedCategory) {
@@ -75,27 +152,31 @@ export default function TransactionDetails() {
       const filePath = TRANSACTIONS_FILE(transaction.book_id);
       const content = await FileSystem.readAsStringAsync(filePath);
       let transactions = JSON.parse(content);
-      
+
       // Update the transaction
-      transactions = transactions.map(t => 
-        t.id === transaction.id ? {
-          ...t,
-          amount: parseFloat(amount),
-          remark,
-          date: date.toISOString().split("T")[0],
-          time: time.toTimeString().substring(0, 8),
-          category_id: selectedCategory,
-          category: categories.find(c => c.id === selectedCategory)?.name || "",
-          type
-        } : t
+      transactions = transactions.map((t) =>
+        t.id === transaction.id
+          ? {
+              ...t,
+              amount: parseFloat(amount),
+              remark,
+              date: date.toISOString().split("T")[0],
+              time: date.toTimeString().substring(0, 8),
+              category_id: selectedCategory,
+              category: categories.find((c) => c.id === selectedCategory)?.name || "",
+              type,
+            }
+          : t
       );
 
-      await FileSystem.writeAsStringAsync(filePath, JSON.stringify(transactions));
+      await FileSystem.writeAsStringAsync(
+        filePath,
+        JSON.stringify(transactions)
+      );
       addTransactions(transactions);
-      
+
       router.back();
     } catch (err) {
-
       console.error(err);
     }
   };
@@ -109,27 +190,19 @@ export default function TransactionDetails() {
       const filePath = TRANSACTIONS_FILE(transaction.book_id);
       const content = await FileSystem.readAsStringAsync(filePath);
       let transactions = JSON.parse(content);
-      
-      transactions = transactions.filter(t => t.id !== transaction.id);
-      await FileSystem.writeAsStringAsync(filePath, JSON.stringify(transactions));
+
+      transactions = transactions.filter((t) => t.id !== transaction.id);
+      await FileSystem.writeAsStringAsync(
+        filePath,
+        JSON.stringify(transactions)
+      );
       addTransactions(transactions);
-      
-      setShowDeleteModal(false); 
+
+      setShowDeleteModal(false);
       router.back();
     } catch (err) {
-
       console.error(err);
     }
-  };
-
-  const onDateChange = (_, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) setDate(selectedDate);
-  };
-
-  const onTimeChange = (_, selectedTime) => {
-    setShowTimePicker(false);
-    if (selectedTime) setTime(selectedTime);
   };
 
   if (loading) {
@@ -145,6 +218,7 @@ export default function TransactionDetails() {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       <Stack.Screen
         options={{
@@ -164,16 +238,36 @@ export default function TransactionDetails() {
         <View style={styles.formGroup}>
           <View style={styles.toggleGroup}>
             <TouchableOpacity
-              style={[styles.toggleButton, type === "income" && styles.activeButtonIn]}
+              style={[
+                styles.toggleButton,
+                type === "income" && styles.activeButtonIn,
+              ]}
               onPress={() => setType("income")}
             >
-              <Text style={type === "income" ? styles.activeTextIn : styles.inactiveText}>আয়</Text>
+              <Text
+                style={
+                  type === "income" ? styles.activeTextIn : styles.inactiveText
+                }
+              >
+                আয়
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.toggleButton, type === "expense" && styles.activeButtonOut]}
+              style={[
+                styles.toggleButton,
+                type === "expense" && styles.activeButtonOut,
+              ]}
               onPress={() => setType("expense")}
             >
-              <Text style={type === "expense" ? styles.activeTextOut : styles.inactiveText}>খরচ</Text>
+              <Text
+                style={
+                  type === "expense"
+                    ? styles.activeTextOut
+                    : styles.inactiveText
+                }
+              >
+                খরচ
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -199,9 +293,18 @@ export default function TransactionDetails() {
               onValueChange={(value) => setSelectedCategory(value)}
               dropdownIconColor="#3b82f6"
             >
-              <Picker.Item label="একটি বিভাগ নির্বাচন করুন" value={null} />
+              <Picker.Item
+                label="একটি বিভাগ নির্বাচন করুন"
+                value={null}
+                fontFamily="bangla_regular"
+              />
               {categories.map((cat) => (
-                <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
+                <Picker.Item
+                  key={cat.id}
+                  label={cat.name}
+                  value={cat.id}
+                  fontFamily="bangla_regular"
+                />
               ))}
             </Picker>
           </View>
@@ -211,20 +314,46 @@ export default function TransactionDetails() {
         <View style={styles.formGroup}>
           <Text style={styles.label}>তারিখ ও সময়*</Text>
           <View style={styles.datetimeContainer}>
-            <TouchableOpacity style={styles.dateInput} onPress={() => setShowDatePicker(true)}>
-              <Text style={{fontFamily : 'bangla_regular'}}>{date.toLocaleDateString('bn-BD')}</Text>
+            <TouchableOpacity
+              style={styles.dateInput}
+              onPress={openAndroidDate}
+            >
+              <Text style={{ fontFamily: "bangla_regular" }}>
+                {date.toLocaleDateString("bn-BD")}
+              </Text>
               <Ionicons name="calendar" size={20} color="#3b82f6" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.dateInput} onPress={() => setShowTimePicker(true)}>
-              <Text style={{fontFamily : 'bangla_regular'}}>{time.toLocaleTimeString('bn-BD', { hour: "2-digit", minute: "2-digit" })}</Text>
+            <TouchableOpacity
+              style={styles.dateInput}
+              onPress={openAndroidTime}
+            >
+              <Text style={{ fontFamily: "bangla_regular" }}>
+                {date.toLocaleTimeString("bn-BD", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </Text>
               <Ionicons name="time" size={20} color="#3b82f6" />
             </TouchableOpacity>
           </View>
-          {showDatePicker && (
-            <DateTimePicker value={date} mode="date" onChange={onDateChange} />
+
+          {/* iOS pickers only */}
+          {Platform.OS === "ios" && showDatePicker && (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              display="spinner"
+              onChange={onChangeDate}
+            />
           )}
-          {showTimePicker && (
-            <DateTimePicker value={time} mode="time" onChange={onTimeChange} />
+          {Platform.OS === "ios" && showTimePicker && (
+            <DateTimePicker
+              value={date}
+              mode="time"
+              display="spinner"
+              onChange={onChangeTime}
+              is24Hour={true}
+            />
           )}
         </View>
 
@@ -310,27 +439,27 @@ export default function TransactionDetails() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8f9fa" },
-  centered: { 
-    flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center" 
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     marginTop: 10,
     color: "#64748b",
-    fontFamily : 'bangla_regular',
+    fontFamily: "bangla_regular",
   },
-  scrollContainer: { 
-    padding: 16, 
-    paddingBottom: 100 
+  scrollContainer: {
+    padding: 16,
+    paddingBottom: 100,
   },
-  formGroup: { 
-    marginBottom: 20 
+  formGroup: {
+    marginBottom: 20,
   },
-  label: {  
-    marginBottom: 8, 
-    color: "#555", 
-    fontFamily : 'bangla_bold',
+  label: {
+    marginBottom: 8,
+    color: "#555",
+    fontFamily: "bangla_bold",
   },
   input: {
     borderWidth: 1,
@@ -340,9 +469,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     fontFamily: "bangla_regular",
   },
-  multilineInput: { 
-    minHeight: 80, 
-    textAlignVertical: "top" ,
+  multilineInput: {
+    minHeight: 80,
+    textAlignVertical: "top",
   },
   pickerContainer: {
     borderWidth: 1,
@@ -376,7 +505,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     alignItems: "center",
-    width: '100%'
+    width: "100%",
   },
   activeButtonIn: {
     backgroundColor: "rgba(34, 197, 94, 0.2)",
@@ -386,20 +515,20 @@ const styles = StyleSheet.create({
   },
   activeTextIn: {
     color: "#22c55e",
-    fontFamily : 'bangla_bold',
+    fontFamily: "bangla_bold",
   },
   activeTextOut: {
     color: "#ef4444",
-    fontFamily : 'bangla_bold',
+    fontFamily: "bangla_bold",
   },
   inactiveText: {
     color: "#333",
-    fontFamily : 'bangla_bold',
+    fontFamily: "bangla_bold",
   },
   footer: {
     flexDirection: "row",
     padding: 16,
-    paddingBottom : 20,
+    paddingBottom: 20,
     backgroundColor: "#f8f9fa",
     borderTopWidth: 1,
     borderTopColor: "#ddd",
@@ -407,26 +536,26 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingVertical : 12,
+    paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
     marginHorizontal: 5,
   },
-  updateButton: { 
-    backgroundColor: "#3b82f6" 
+  updateButton: {
+    backgroundColor: "#3b82f6",
   },
-  deleteButton: { 
-    backgroundColor: "#ef4444" 
+  deleteButton: {
+    backgroundColor: "#ef4444",
   },
-  disabledButton: { 
-    backgroundColor: "#a0a0a0" 
+  disabledButton: {
+    backgroundColor: "#a0a0a0",
   },
-  buttonText: { 
-    color: "#fff", 
-    fontFamily : 'bangla_bold',
+  buttonText: {
+    color: "#fff",
+    fontFamily: "bangla_bold",
   },
-  headerButton: { 
-    marginRight: 16 
+  headerButton: {
+    marginRight: 16,
   },
   // মডাল স্টাইলস
   modalOverlay: {
@@ -445,13 +574,13 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontFamily: 'bangla_bold',
+    fontFamily: "bangla_bold",
     marginBottom: 10,
     textAlign: "center",
     color: "#333",
   },
   modalMessage: {
-    fontFamily: 'bangla_regular',
+    fontFamily: "bangla_regular",
     marginBottom: 20,
     textAlign: "center",
     color: "#555",
@@ -476,10 +605,10 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: "#333",
-    fontFamily: 'bangla_bold',
+    fontFamily: "bangla_bold",
   },
   deleteButtonText: {
     color: "#fff",
-    fontFamily: 'bangla_bold',
+    fontFamily: "bangla_bold",
   },
 });

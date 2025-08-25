@@ -5,6 +5,7 @@ import * as FileSystem from "expo-file-system";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   StyleSheet,
@@ -16,7 +17,9 @@ import {
 import CreateCategoryModal from "../../components/CreateCategoryModal";
 import { useStore } from "../../utils/z-store";
 
-const CATEGORIES_FILE = FileSystem.documentDirectory + "categories.json";
+const APP_DIR = FileSystem.documentDirectory;
+const CATEGORIES_FILE = APP_DIR + "categories.json";
+const BOOK_FILE = APP_DIR + "books.json";
 
 export default function Categories() {
   const { addTransactions } = useStore();
@@ -126,7 +129,7 @@ export default function Categories() {
       );
 
       if (existing) {
-        return;
+        return Alert.alert("ত্রুটি", "এই নামে ইতিমধ্যে একটি ক্যাটাগরি রয়েছে।");
       }
 
       let updatedCategories;
@@ -189,13 +192,61 @@ export default function Categories() {
     if (!categoryToDelete) return;
 
     try {
+      // "অন্যান্য খরচ" ক্যাটাগরি খুঁজে বের করুন
       const othersCategory = categories.find(
-        (cat) => cat.name === "অন্যান্য খরচ"
+        (cat) => cat.name === "অন্যান্য"
       );
       if (!othersCategory) {
+        Alert.alert("ত্রুটি", "'অন্যান্য খরচ' ক্যাটাগরি পাওয়া যায়নি");
         return;
       }
 
+      // 1. সব বই লোড করুন
+      const booksFileInfo = await FileSystem.getInfoAsync(BOOK_FILE);
+      if (!booksFileInfo.exists) {
+        Alert.alert("ত্রুটি", "বইয়ের ডাটা পাওয়া যায়নি");
+        return;
+      }
+
+      const booksContent = await FileSystem.readAsStringAsync(BOOK_FILE);
+      const allBooks = JSON.parse(booksContent);
+
+      // 2. প্রতিটি বইয়ের ট্রানজেকশন ফাইল চেক করুন
+      for (const book of allBooks) {
+        const bookTransactionsFile = APP_DIR + `book_${book.id}.json`;
+        const transactionsFileInfo = await FileSystem.getInfoAsync(bookTransactionsFile);
+        
+        if (transactionsFileInfo.exists) {
+          const transactionsContent = await FileSystem.readAsStringAsync(bookTransactionsFile);
+          let transactions = JSON.parse(transactionsContent);
+          
+          // 3. ডিলিট করা ক্যাটাগরি ব্যবহার করা ট্রানজেকশনগুলো খুঁজুন
+          const hasTransactionsWithCategory = transactions.some(
+            transaction => transaction.category_id === categoryToDelete.id
+          );
+          
+          if (hasTransactionsWithCategory) {
+            // 4. ক্যাটাগরি আপডেট করুন
+            transactions = transactions.map(transaction => 
+              transaction.category_id === categoryToDelete.id
+                ? {
+                    ...transaction,
+                    category_id: othersCategory.id,
+                    category: othersCategory.name
+                  }
+                : transaction
+            );
+            
+            // 5. আপডেট করা ট্রানজেকশনস সেভ করুন
+            await FileSystem.writeAsStringAsync(
+              bookTransactionsFile,
+              JSON.stringify(transactions)
+            );
+          }
+        }
+      }
+
+      // 6. ক্যাটাগরি লিস্ট আপডেট করুন
       const updatedCategories = categories.filter(
         (cat) => cat.id !== categoryToDelete.id
       );
@@ -204,11 +255,15 @@ export default function Categories() {
         JSON.stringify(updatedCategories)
       );
 
+      // 7. স্টেট আপডেট করুন
       setCategories(updatedCategories);
       setShowDeleteModal(false);
       setCategoryToDelete(null);
+      
+      Alert.alert("সফল", "ক্যাটাগরি ডিলিট করা হয়েছে এবং সংশ্লিষ্ট ট্রানজেকশনগুলো আপডেট করা হয়েছে");
     } catch (error) {
       console.error("Delete error:", error);
+      Alert.alert("ত্রুটি", "ক্যাটাগরি ডিলিট করতে সমস্যা হয়েছে");
     }
   };
 
@@ -238,7 +293,7 @@ export default function Categories() {
       <FlatList
         data={filteredCategories}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingVertical: 12 }}
+        contentContainerStyle={{ paddingVertical: 12, paddingBottom: 80 }}
         renderItem={({ item }) => (
           <View style={styles.categoryItem}>
             <Text style={styles.categoryName}>{item.name}</Text>
@@ -305,7 +360,7 @@ export default function Categories() {
             <Text style={styles.modalTitle}>ক্যাটাগরি ডিলিট করুন</Text>
             <Text style={styles.modalMessage}>
               আপনি কি নিশ্চিত যে আপনি {categoryToDelete?.name} ক্যাটাগরি ডিলিট
-              করতে চান?
+              করতে চান? এই ক্যাটাগরি ব্যবহৃত সকল ট্রানজেকশনে &quot;অন্যান্য&quot; ক্যাটাগরি সেট করা হবে।
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -338,7 +393,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
-    marginTop: 16,
+    marginTop: 12,
+    marginBottom: 8,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 10,

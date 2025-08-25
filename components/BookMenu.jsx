@@ -39,6 +39,8 @@ export default function BookMenu({
     bangla_bold: require("../assets/fonts/bangla_bold.ttf"),
   };
 
+  console.log(transactions);
+
   const [base64Fonts, setBase64Fonts] = useState({});
 
   useEffect(() => {
@@ -162,7 +164,7 @@ const handlePdf = async () => {
     );
     const balance = totalIncome - totalExpense;
 
-    const transactionRows = transactions
+    const transactionRows = transactions.reverse()
       .map(
         (t) => `
       <tr>

@@ -68,7 +68,6 @@ export default function BookDetails() {
     let balance = 0;
     return transactions
       .slice()
-      .reverse()
       .map((transaction) => {
         balance =
           transaction.type === "income"
